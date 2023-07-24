@@ -537,7 +537,7 @@ int main(void)
     cert_info_bl2->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl2->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl2->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl2->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl2->certificate_policy_val = certificate_policy_val_LDevID;
     cert_info_bl2->tci = tci_bl1;
 
     cert_info_bl31->subject_key = "bl31.pem";
@@ -558,7 +558,7 @@ int main(void)
     cert_info_bl31->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl31->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl31->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl31->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl31->certificate_policy_val = certificate_policy_val_LDevID;
     cert_info_bl31->tci = tci_bl1;
 
     cert_info_bl32->subject_key = "bl32.pem";
@@ -579,7 +579,7 @@ int main(void)
     cert_info_bl32->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl32->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl32->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl32->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl32->certificate_policy_val = certificate_policy_val_LDevID;
     cert_info_bl32->tci = tci_bl1;
 
     cert_info_ekcert->subject_key = "ekcert.pem";
@@ -591,7 +591,7 @@ int main(void)
     cert_info_ekcert->not_after = DFL_NOT_AFTER;
     cert_info_ekcert->serial = DFL_SERIAL;
     cert_info_ekcert->selfsign = 0;
-    cert_info_ekcert->is_ca = 1;
+    cert_info_ekcert->is_ca = 0;
     cert_info_ekcert->max_pathlen = DFL_MAX_PATHLEN;
     cert_info_ekcert->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
     cert_info_ekcert->ns_cert_type = DFL_NS_CERT_TYPE;
@@ -600,7 +600,7 @@ int main(void)
     cert_info_ekcert->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_ekcert->authority_identifier = DFL_AUTH_IDENT;
     cert_info_ekcert->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_ekcert->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_ekcert->certificate_policy_val = certificate_policy_val_LDevID;
     cert_info_ekcert->tci = tci_bl1;
 
     int exit_code;
