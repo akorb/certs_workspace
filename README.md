@@ -22,4 +22,3 @@ For build-run-check cycle:
 ```shell
 make && ./main && openssl x509 -in bl31.crt -text
 ```
-
