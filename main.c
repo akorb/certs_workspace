@@ -48,6 +48,40 @@ int main(void)
 #define DFL_DIGEST MBEDTLS_MD_SHA256
 
 /*
+Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
+
+{
+    "seq": [
+        {
+            "seq": [
+                {
+                    "oid": {
+                        "oid": "2.23.133.5.4.100.6"
+                    }
+                }
+            ]
+        }
+    ]
+}
+*/
+static const uint8_t certificate_policy_val_IDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x06};
+static const uint8_t certificate_policy_val_LDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x07};
+
+uint8_t attestation_extension_value_preface[] = {
+    0x30, 0x31, 0xa6, 0x2f, 0x30, 0x2d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
+    0x65, 0x03, 0x04, 0x02, 0x01, 0x04, 0x20};
+
+// SHA256, 256 Bits = 32 Bytes
+#define TCI_LEN 32
+#define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
+
+const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
+static const uint8_t comp1_tci[TCI_LEN] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
+                                           0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
+                                           0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
+                                           0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
+
+/*
  * global options
  */
 typedef struct cert_info
@@ -70,6 +104,8 @@ typedef struct cert_info
     mbedtls_md_type_t md;       /* Hash used for signing                */
     unsigned char key_usage;    /* key usage flags                      */
     unsigned char ns_cert_type; /* NS cert type                         */
+    const uint8_t *certificate_policy_val;
+    const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
 } cert_info;
 
 int write_certificate(mbedtls_x509write_cert *crt, const char *output_file,
@@ -372,42 +408,21 @@ int create_certificate(cert_info ci)
         mbedtls_printf(" ok\n");
     }
 
-    mbedtls_printf("  . Add extension...");
+    mbedtls_printf("  . Add certificate policy extension...");
 
-    /*
-    Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
+    mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy_val, CERTIFICATE_POLICY_VAL_LEN);
+    mbedtls_printf(" ok\n");
 
-    {
-        "seq": [
-            {
-                "seq": [
-                    {
-                        "oid": {
-                            "oid": "2.23.133.5.4.100.9"
-                        }
-                    }
-                ]
-            }
-        ]
-    }
-    */
-    const uint8_t certificate_policy_val[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x09};
-    mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, certificate_policy_val, sizeof(certificate_policy_val));
+    mbedtls_printf("  . Add DICE attestation extension...");
 
-    uint8_t attestation_extension_data[19 + 32] = {
-        0x30, 0x31, 0xa6, 0x2f, 0x30, 0x2d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
-        0x65, 0x03, 0x04, 0x02, 0x01, 0x04, 0x20
-        // The remaining 32 bytes (containing the hash) are not set yet
-    };
+    uint8_t attestation_extension_value[sizeof(attestation_extension_value_preface) + TCI_LEN];
 
-    const char hash[32] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
-                           0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
-                           0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
-                           0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
+    // Set preface
+    memcpy(attestation_extension_value, attestation_extension_value_preface, sizeof(attestation_extension_value_preface));
+    // Set TCI
+    memcpy(&attestation_extension_value[sizeof(attestation_extension_value_preface)], ci.tci, TCI_LEN);
 
-    const char attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
-    memcpy(&attestation_extension_data[19], hash, 32);
-    mbedtls_x509write_crt_set_extension(&crt, attestation_oid, sizeof(attestation_oid), 0, attestation_extension_data, sizeof(attestation_extension_data));
+    mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, attestation_extension_value, sizeof(attestation_extension_value));
     mbedtls_printf(" ok\n");
 
     /*
@@ -462,6 +477,8 @@ int main(void)
     ci.subject_identifier = DFL_SUBJ_IDENT;
     ci.authority_identifier = DFL_AUTH_IDENT;
     ci.basic_constraints = DFL_CONSTRAINTS;
+    ci.certificate_policy_val = certificate_policy_val_IDevID;
+    ci.tci = comp1_tci;
 
     ci.subject_key = "key.pem";
     ci.issuer_key = "key.pem";
