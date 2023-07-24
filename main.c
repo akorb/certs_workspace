@@ -33,8 +33,8 @@ int main(void)
 #define DFL_OUTPUT_FILENAME "cert.crt"
 #define DFL_SUBJECT_NAME "CN=Cert,O=mbed TLS,C=UK"
 #define DFL_ISSUER_NAME "CN=CA,O=mbed TLS,C=UK"
-#define DFL_NOT_BEFORE "20010101000000"
-#define DFL_NOT_AFTER "20301231235959"
+#define DFL_NOT_BEFORE "20230801000000"
+#define DFL_NOT_AFTER "99991231235959"
 #define DFL_SERIAL "1"
 #define DFL_SELFSIGN 0
 #define DFL_IS_CA 0
@@ -76,10 +76,10 @@ uint8_t attestation_extension_value_preface[] = {
 #define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
 
 const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
-static const uint8_t comp1_tci[TCI_LEN] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
-                                           0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
-                                           0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
-                                           0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
+static const uint8_t tci_bl1[TCI_LEN] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
+                                         0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
+                                         0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
+                                         0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
 
 /*
  * global options
@@ -408,22 +408,27 @@ int create_certificate(cert_info ci)
         mbedtls_printf(" ok\n");
     }
 
-    mbedtls_printf("  . Add certificate policy extension...");
+    if (ci.certificate_policy_val)
+    {
+        mbedtls_printf("  . Add certificate policy extension...");
 
-    mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy_val, CERTIFICATE_POLICY_VAL_LEN);
-    mbedtls_printf(" ok\n");
+        mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy_val, CERTIFICATE_POLICY_VAL_LEN);
+        mbedtls_printf(" ok\n");
+    }
 
-    mbedtls_printf("  . Add DICE attestation extension...");
+    if (ci.tci)
+    {
+        mbedtls_printf("  . Add DICE attestation extension...");
+        uint8_t attestation_extension_value[sizeof(attestation_extension_value_preface) + TCI_LEN];
 
-    uint8_t attestation_extension_value[sizeof(attestation_extension_value_preface) + TCI_LEN];
+        // Set preface
+        memcpy(attestation_extension_value, attestation_extension_value_preface, sizeof(attestation_extension_value_preface));
+        // Set TCI
+        memcpy(&attestation_extension_value[sizeof(attestation_extension_value_preface)], ci.tci, TCI_LEN);
 
-    // Set preface
-    memcpy(attestation_extension_value, attestation_extension_value_preface, sizeof(attestation_extension_value_preface));
-    // Set TCI
-    memcpy(&attestation_extension_value[sizeof(attestation_extension_value_preface)], ci.tci, TCI_LEN);
-
-    mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, attestation_extension_value, sizeof(attestation_extension_value));
-    mbedtls_printf(" ok\n");
+        mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, attestation_extension_value, sizeof(attestation_extension_value));
+        mbedtls_printf(" ok\n");
+    }
 
     /*
      * 1.2. Writing the certificate
@@ -458,51 +463,155 @@ exit:
 
 int main(void)
 {
-    cert_info ci;
-    ci.subject_key = DFL_SUBJECT_KEY;
-    ci.issuer_key = DFL_ISSUER_KEY;
-    ci.output_file = DFL_OUTPUT_FILENAME;
-    ci.subject_name = DFL_SUBJECT_NAME;
-    ci.issuer_name = DFL_ISSUER_NAME;
-    ci.not_before = DFL_NOT_BEFORE;
-    ci.not_after = DFL_NOT_AFTER;
-    ci.serial = DFL_SERIAL;
-    ci.selfsign = DFL_SELFSIGN;
-    ci.is_ca = DFL_IS_CA;
-    ci.max_pathlen = DFL_MAX_PATHLEN;
-    ci.key_usage = DFL_KEY_USAGE;
-    ci.ns_cert_type = DFL_NS_CERT_TYPE;
-    ci.version = DFL_VERSION - 1;
-    ci.md = DFL_DIGEST;
-    ci.subject_identifier = DFL_SUBJ_IDENT;
-    ci.authority_identifier = DFL_AUTH_IDENT;
-    ci.basic_constraints = DFL_CONSTRAINTS;
-    ci.certificate_policy_val = certificate_policy_val_IDevID;
-    ci.tci = comp1_tci;
+    const char name_manufacturer[] = "CN=the CN,O=Cool company,C=GER";
+    const char name_bl1[] = "CN=BL1,O=AP Trusted ROM,C=GER";
+    const char name_bl2[] = "CN=BL1,O=Trusted Boot Firmware,C=GER";
+    const char name_bl31[] = "CN=BL1,O=EL3 Runtime Software,C=GER";
+    const char name_bl32[] = "CN=BL1,O=OP-TEE OS,C=GER";
+    const char name_ekcert[] = "CN=EKCert,O=TPM EK,C=GER";
 
-    ci.subject_key = "key.pem";
-    ci.issuer_key = "key.pem";
+    cert_info cis[6];
+    memset(cis, 0, sizeof(cis));
+    cert_info *cert_info_manufacturer = &cis[0];
+    cert_info *cert_info_bl1 = &cis[1];
+    cert_info *cert_info_bl2 = &cis[2];
+    cert_info *cert_info_bl31 = &cis[3];
+    cert_info *cert_info_bl32 = &cis[4];
+    cert_info *cert_info_ekcert = &cis[5];
 
-    printf("ci.subject_key = %s\n", ci.subject_key);
-    printf("ci.issuer_key = %s\n", ci.issuer_key);
-    printf("ci.output_file = %s\n", ci.output_file);
-    printf("ci.subject_name = %s\n", ci.subject_name);
-    printf("ci.issuer_name = %s\n", ci.issuer_name);
-    printf("ci.not_before = %s\n", ci.not_before);
-    printf("ci.not_after = %s\n", ci.not_after);
-    printf("ci.serial = %p\n", ci.serial);
-    printf("ci.selfsign = %d\n", ci.selfsign);
-    printf("ci.is_ca = %d\n", ci.is_ca);
-    printf("ci.max_pathlen = %d\n", ci.max_pathlen);
-    printf("ci.key_usage = %d\n", ci.key_usage);
-    printf("ci.ns_cert_type = %d\n", ci.ns_cert_type);
-    printf("ci.version = %d\n", ci.version);
-    printf("ci.md = %d\n", ci.md);
-    printf("ci.subject_identifier = %d\n", ci.subject_identifier);
-    printf("ci.authority_identifier = %d\n", ci.authority_identifier);
-    printf("ci.basic_constraints = %d\n", ci.basic_constraints);
+    cert_info_manufacturer->subject_key = "manufacturer.pem";
+    cert_info_manufacturer->issuer_key = "manufacturer.pem";
+    cert_info_manufacturer->output_file = "manufacturer.crt";
+    cert_info_manufacturer->subject_name = name_manufacturer;
+    cert_info_manufacturer->issuer_name = name_manufacturer;
+    cert_info_manufacturer->not_before = DFL_NOT_BEFORE;
+    cert_info_manufacturer->not_after = DFL_NOT_AFTER;
+    cert_info_manufacturer->serial = DFL_SERIAL;
+    cert_info_manufacturer->selfsign = 1;
+    cert_info_manufacturer->is_ca = 1;
+    cert_info_manufacturer->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_manufacturer->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_manufacturer->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_manufacturer->version = DFL_VERSION - 1;
+    cert_info_manufacturer->md = DFL_DIGEST;
+    cert_info_manufacturer->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_manufacturer->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_manufacturer->basic_constraints = DFL_CONSTRAINTS;
 
-    int exit_code = create_certificate(ci);
+    cert_info_bl1->subject_key = "bl1.pem";
+    cert_info_bl1->issuer_key = "manufacturer.pem";
+    cert_info_bl1->output_file = "bl1.crt";
+    cert_info_bl1->subject_name = name_bl1;
+    cert_info_bl1->issuer_name = name_manufacturer;
+    cert_info_bl1->not_before = DFL_NOT_BEFORE;
+    cert_info_bl1->not_after = DFL_NOT_AFTER;
+    cert_info_bl1->serial = DFL_SERIAL;
+    cert_info_bl1->selfsign = 0;
+    cert_info_bl1->is_ca = 1;
+    cert_info_bl1->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_bl1->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_bl1->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_bl1->version = DFL_VERSION - 1;
+    cert_info_bl1->md = DFL_DIGEST;
+    cert_info_bl1->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_bl1->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
+    cert_info_bl1->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl1->tci = tci_bl1;
+
+    cert_info_bl2->subject_key = "bl2.pem";
+    cert_info_bl2->issuer_key = "bl1.pem";
+    cert_info_bl2->output_file = "bl2.crt";
+    cert_info_bl2->subject_name = name_bl2;
+    cert_info_bl2->issuer_name = name_bl1;
+    cert_info_bl2->not_before = DFL_NOT_BEFORE;
+    cert_info_bl2->not_after = DFL_NOT_AFTER;
+    cert_info_bl2->serial = DFL_SERIAL;
+    cert_info_bl2->selfsign = 0;
+    cert_info_bl2->is_ca = 1;
+    cert_info_bl2->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_bl2->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_bl2->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_bl2->version = DFL_VERSION - 1;
+    cert_info_bl2->md = DFL_DIGEST;
+    cert_info_bl2->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_bl2->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_bl2->basic_constraints = DFL_CONSTRAINTS;
+    cert_info_bl2->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl2->tci = tci_bl1;
+
+    cert_info_bl31->subject_key = "bl31.pem";
+    cert_info_bl31->issuer_key = "bl2.pem";
+    cert_info_bl31->output_file = "bl31.crt";
+    cert_info_bl31->subject_name = name_bl31;
+    cert_info_bl31->issuer_name = name_bl2;
+    cert_info_bl31->not_before = DFL_NOT_BEFORE;
+    cert_info_bl31->not_after = DFL_NOT_AFTER;
+    cert_info_bl31->serial = DFL_SERIAL;
+    cert_info_bl31->selfsign = 0;
+    cert_info_bl31->is_ca = 1;
+    cert_info_bl31->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_bl31->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_bl31->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_bl31->version = DFL_VERSION - 1;
+    cert_info_bl31->md = DFL_DIGEST;
+    cert_info_bl31->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_bl31->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_bl31->basic_constraints = DFL_CONSTRAINTS;
+    cert_info_bl31->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl31->tci = tci_bl1;
+
+    cert_info_bl32->subject_key = "bl32.pem";
+    cert_info_bl32->issuer_key = "bl31.pem";
+    cert_info_bl32->output_file = "bl32.crt";
+    cert_info_bl32->subject_name = name_bl32;
+    cert_info_bl32->issuer_name = name_bl31;
+    cert_info_bl32->not_before = DFL_NOT_BEFORE;
+    cert_info_bl32->not_after = DFL_NOT_AFTER;
+    cert_info_bl32->serial = DFL_SERIAL;
+    cert_info_bl32->selfsign = 0;
+    cert_info_bl32->is_ca = 1;
+    cert_info_bl32->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_bl32->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_bl32->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_bl32->version = DFL_VERSION - 1;
+    cert_info_bl32->md = DFL_DIGEST;
+    cert_info_bl32->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_bl32->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_bl32->basic_constraints = DFL_CONSTRAINTS;
+    cert_info_bl32->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl32->tci = tci_bl1;
+
+    cert_info_ekcert->subject_key = "ekcert.pem";
+    cert_info_ekcert->issuer_key = "bl32.pem";
+    cert_info_ekcert->output_file = "ekcert.crt";
+    cert_info_ekcert->subject_name = name_ekcert;
+    cert_info_ekcert->issuer_name = name_bl32;
+    cert_info_ekcert->not_before = DFL_NOT_BEFORE;
+    cert_info_ekcert->not_after = DFL_NOT_AFTER;
+    cert_info_ekcert->serial = DFL_SERIAL;
+    cert_info_ekcert->selfsign = 0;
+    cert_info_ekcert->is_ca = 1;
+    cert_info_ekcert->max_pathlen = DFL_MAX_PATHLEN;
+    cert_info_ekcert->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
+    cert_info_ekcert->ns_cert_type = DFL_NS_CERT_TYPE;
+    cert_info_ekcert->version = DFL_VERSION - 1;
+    cert_info_ekcert->md = DFL_DIGEST;
+    cert_info_ekcert->subject_identifier = DFL_SUBJ_IDENT;
+    cert_info_ekcert->authority_identifier = DFL_AUTH_IDENT;
+    cert_info_ekcert->basic_constraints = DFL_CONSTRAINTS;
+    cert_info_ekcert->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_ekcert->tci = tci_bl1;
+
+    int exit_code;
+    for (int i = 0; i < sizeof(cis) / sizeof(cis[0]); i++)
+    {
+        exit_code = create_certificate(cis[i]);
+        if (exit_code != 0)
+        {
+            mbedtls_exit(exit_code);
+        }
+    }
 
     mbedtls_exit(exit_code);
 }
