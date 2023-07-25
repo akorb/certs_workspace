@@ -19,8 +19,6 @@ int main(void)
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/x509_csr.h"
 #include "mbedtls/oid.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/ctr_drbg.h"
 #include "mbedtls/md.h"
 #include "mbedtls/error.h"
 
@@ -108,9 +106,7 @@ typedef struct cert_info
     const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
 } cert_info;
 
-int write_certificate(mbedtls_x509write_cert *crt, const char *output_file,
-                      int (*f_rng)(void *, unsigned char *, size_t),
-                      void *p_rng)
+int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
 {
     int ret;
     FILE *f;
@@ -119,7 +115,7 @@ int write_certificate(mbedtls_x509write_cert *crt, const char *output_file,
 
     memset(output_buf, 0, 4096);
     if ((ret = mbedtls_x509write_crt_pem(crt, output_buf, 4096,
-                                         f_rng, p_rng)) < 0)
+                                         NULL, NULL)) < 0)
     {
         return ret;
     }
@@ -162,9 +158,6 @@ int create_certificate(cert_info ci)
     char buf[1024];
     mbedtls_x509write_cert crt;
     mbedtls_mpi serial;
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    const char *pers = "crt example app";
 
     /*
      * Set to sane values
@@ -173,30 +166,10 @@ int create_certificate(cert_info ci)
     mbedtls_pk_init(&loaded_issuer_key);
     mbedtls_pk_init(&loaded_subject_key);
     mbedtls_mpi_init(&serial);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_entropy_init(&entropy);
     mbedtls_x509_crt_init(&issuer_crt);
     memset(buf, 0, 1024);
 
     mbedtls_printf("\n");
-
-    /*
-     * 0. Seed the PRNG
-     */
-    mbedtls_printf("  . Seeding the random number generator...");
-    fflush(stdout);
-
-    if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
-                                     (const unsigned char *)pers,
-                                     strlen(pers))) != 0)
-    {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_ctr_drbg_seed returned %d - %s\n",
-                       ret, buf);
-        goto exit;
-    }
-
-    mbedtls_printf(" ok\n");
 
     // Parse serial to MPI
     //
@@ -436,8 +409,7 @@ int create_certificate(cert_info ci)
     mbedtls_printf("  . Writing the certificate...");
     fflush(stdout);
 
-    if ((ret = write_certificate(&crt, ci.output_file,
-                                 mbedtls_ctr_drbg_random, &ctr_drbg)) != 0)
+    if ((ret = write_certificate(&crt, ci.output_file)) != 0)
     {
         mbedtls_strerror(ret, buf, 1024);
         mbedtls_printf(" failed\n  !  write_certificate -0x%04x - %s\n\n",
@@ -455,8 +427,6 @@ exit:
     mbedtls_pk_free(&loaded_subject_key);
     mbedtls_pk_free(&loaded_issuer_key);
     mbedtls_mpi_free(&serial);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
 
     return exit_code;
 }
