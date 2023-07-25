@@ -33,8 +33,8 @@ int main(void)
 #define DFL_OUTPUT_FILENAME "cert.crt"
 #define DFL_SUBJECT_NAME "CN=Cert,O=mbed TLS,C=UK"
 #define DFL_ISSUER_NAME "CN=CA,O=mbed TLS,C=UK"
-#define DFL_NOT_BEFORE "20230801000000"
-#define DFL_NOT_AFTER "99991231235959"
+#define DFL_NOT_BEFORE "20230725000000"
+#define DFL_NOT_AFTER  "99991231235959"
 #define DFL_SERIAL "1"
 #define DFL_SELFSIGN 0
 #define DFL_IS_CA 0
@@ -461,6 +461,51 @@ exit:
     return exit_code;
 }
 
+void verify()
+{
+    // From https://stackoverflow.com/a/72722115/2050020
+
+    int32_t r;
+    uint32_t flags = 0;
+
+    mbedtls_x509_crt ca, chain;
+
+    mbedtls_x509_crt_init(&ca);
+    mbedtls_x509_crt_init(&chain);
+
+    do {
+        r = mbedtls_x509_crt_parse_file(&ca, "manufacturer.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        r = mbedtls_x509_crt_parse_file(&chain, "bl1.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        r = mbedtls_x509_crt_parse_file(&chain, "bl2.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        r = mbedtls_x509_crt_parse_file(&chain, "bl31.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        r = mbedtls_x509_crt_parse_file(&chain, "bl32.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        r = mbedtls_x509_crt_parse_file(&chain, "ekcert.crt");
+        if (EXIT_SUCCESS != r) break;
+
+        if ((r = mbedtls_x509_crt_verify(&chain, &ca, NULL, NULL, &flags,
+                                         NULL, NULL)) != 0) {
+            char vrfy_buf[512];
+            mbedtls_printf(" failed\n");
+            mbedtls_x509_crt_verify_info(vrfy_buf, sizeof(vrfy_buf), "  ! ", flags);
+            mbedtls_printf("%s\n", vrfy_buf);
+        } else
+            mbedtls_printf(" Verify OK\n");
+
+    } while (0);
+
+    if (0 != r) mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
+}
+
 int main(void)
 {
     const char name_manufacturer[] = "CN=the CN,O=Cool company,C=GER";
@@ -612,6 +657,8 @@ int main(void)
             mbedtls_exit(exit_code);
         }
     }
+
+    verify();
 
     mbedtls_exit(exit_code);
 }
