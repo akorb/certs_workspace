@@ -5,3 +5,6 @@ LDFLAGS=-l:libmbedtls.so.2.28.3 -l:libmbedx509.so.2.28.3 -l:libmbedcrypto.so.2.2
 .PHONY: all
 all:
 	$(CC) -o main $(CFLAGS) $(LDFLAGS) main.c
+
+clean:
+	rm -f *.crt *.pem  main
