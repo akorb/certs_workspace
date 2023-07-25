@@ -151,7 +151,6 @@ int create_certificate(cert_info ci)
 {
     int ret = 1;
     int exit_code = MBEDTLS_EXIT_FAILURE;
-    mbedtls_x509_crt issuer_crt;
     mbedtls_pk_context loaded_issuer_key, loaded_subject_key;
     mbedtls_pk_context *issuer_key = &loaded_issuer_key,
                        *subject_key = &loaded_subject_key;
@@ -166,7 +165,6 @@ int create_certificate(cert_info ci)
     mbedtls_pk_init(&loaded_issuer_key);
     mbedtls_pk_init(&loaded_subject_key);
     mbedtls_mpi_init(&serial);
-    mbedtls_x509_crt_init(&issuer_crt);
     memset(buf, 0, 1024);
 
     mbedtls_printf("\n");
@@ -422,7 +420,6 @@ int create_certificate(cert_info ci)
     exit_code = MBEDTLS_EXIT_SUCCESS;
 
 exit:
-    mbedtls_x509_crt_free(&issuer_crt);
     mbedtls_x509write_crt_free(&crt);
     mbedtls_pk_free(&loaded_subject_key);
     mbedtls_pk_free(&loaded_issuer_key);
@@ -486,8 +483,74 @@ void verify()
         mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
 }
 
+static const uint8_t crt_bl32[] =
+"-----BEGIN CERTIFICATE-----\n\
+MIIDojCCAoqgAwIBAgIBATANBgkqhkiG9w0BAQsFADA7MQwwCgYDVQQDDANCTDEx\n\
+HTAbBgNVBAoMFEVMMyBSdW50aW1lIFNvZnR3YXJlMQwwCgYDVQQGEwNHRVIwIBcN\n\
+MjMwNzI1MDAwMDAwWhgPOTk5OTEyMzEyMzU5NTlaMDAxDDAKBgNVBAMMA0JMMTES\n\
+MBAGA1UECgwJT1AtVEVFIE9TMQwwCgYDVQQGEwNHRVIwggEiMA0GCSqGSIb3DQEB\n\
+AQUAA4IBDwAwggEKAoIBAQCZHmB/jGls35xWyGtguxIRIvaX1ncTBdKyrXPbBm5T\n\
++7CraPLgQpLVhAN1oN67XOXNNLiaKCb0/I2MgLsq0+SI1YYPZU5nSRZ9rVVtTMym\n\
+8AtASwPjDOBJm/s6Hp9+Q8gxHazYEH9BCc2v6j9A3kjV6cslynaiwZvN4K+aix6k\n\
+1mdoTitJylhVN1k/1a2ZsFHicLPnWPtXgOoZ0PDdN6YLZbS0Ka6BdAEuKTVH/UHz\n\
+4bVz3eAsLM881cIHyAzhauPanpcs2FuAC6HOSn6AXPuTfiBcTuwFFw0PFVIGhZaW\n\
+/bptcc3elB60Mqy5EwjeJaV2C4/Bc4LoqqDFuJl8ES5jAgMBAAGjgbkwgbYwDwYD\n\
+VR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUG5tZTkK8L26sIIQ1mWTom4eb6t8wHwYD\n\
+VR0jBBgwFoAUs3Ke3i8pF+A9ceYDmcHSshvYnFIwDgYDVR0PAQH/BAQDAgIEMBQG\n\
+A1UdIAQNMAswCQYHZ4EFBQRkBzA9BgZngQUFBAEEMzAxpi8wLQYJYIZIAWUDBAIB\n\
+BCBMzvpofTi+j+GFwL+Ssozbaegn4OI5IL4sz0qyug3pYDANBgkqhkiG9w0BAQsF\n\
+AAOCAQEAgqPZLeICZ9AKjTK3V+NCv6LuPuvx9ZRTIPv3Tfwmr36qfCQ3G/cwAoUR\n\
+uzjr4XHl4ABFfiIB9DRzmQwkzpQuYWZtW+Z6zDZ4BpZwFnayaMXuAvk+uC/Z4D/V\n\
+GZCXBV25RodNpiYrrAJJPvOjStc82P5YOsqStOh07jtIcI0M33Vk20VrrKpQ/HTK\n\
+l2nwcziFaZBABpjRHjvFSFPUjeRzv8CVIKuaRUy8TOqLS2xOr2TW/u1i7urrYW3N\n\
+TnP85FFwP4YajI91iDzI9UTjRnrhe1k+wmNL/EaYt2Hm5N3bct5p0Mxeff1r87z7\n\
+ACi2j3Jaf1J94i2Wz6GlTRRBYYMuWw==\n\
+-----END CERTIFICATE-----";
+
+static const uint8_t key_bl32[] =
+"-----BEGIN PRIVATE KEY-----\n\
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCZHmB/jGls35xW\n\
+yGtguxIRIvaX1ncTBdKyrXPbBm5T+7CraPLgQpLVhAN1oN67XOXNNLiaKCb0/I2M\n\
+gLsq0+SI1YYPZU5nSRZ9rVVtTMym8AtASwPjDOBJm/s6Hp9+Q8gxHazYEH9BCc2v\n\
+6j9A3kjV6cslynaiwZvN4K+aix6k1mdoTitJylhVN1k/1a2ZsFHicLPnWPtXgOoZ\n\
+0PDdN6YLZbS0Ka6BdAEuKTVH/UHz4bVz3eAsLM881cIHyAzhauPanpcs2FuAC6HO\n\
+Sn6AXPuTfiBcTuwFFw0PFVIGhZaW/bptcc3elB60Mqy5EwjeJaV2C4/Bc4LoqqDF\n\
+uJl8ES5jAgMBAAECggEANbBIjsCpoLLBa06IFBlUCu0zAOeCxglHKT6XfoeBPPJm\n\
+Lpw0eTzupm5NFjwrjQ/URgFD702/5yv85/SlbC1zFyWjhZd0h9PBTpzt9M62fZxy\n\
+nX8QJFc596V5UBY3v3q94bbxiaszK5dn51RgDHtEl7kL8brNoWD4pBYyDKLWQl6e\n\
+eFyOpa3RQRny3cp02qK+QQjgmrdrSjP6rPzk6rF3FpypWhBU9iPPTw61+4YvRpK5\n\
+7ZtQfxtup9UPX5oepvARIxXt3nWExICr5yRfMObJ4IR9qnszR4/yXMccRtMHPrxF\n\
+t1V+iIy89QuBkfPyhXqs9nnlLBLbD1E6AjA3EEu4TQKBgQDG6ULiCWz6qxSodibM\n\
+9vqzmBsEIrl5++NTe7xU0jpwP3GFZCHzRlMN74jJODBpuIwvFavfMzm2cVePB9Mw\n\
+HjK4yv2V4AOBXarPKLUwoN2y30n2A7UMZNVv6P+s3XKuXOJTI8E/k3NUOt0H00kD\n\
+HlEPlnK9iY3UqwJuf2K3U38STQKBgQDFEJIDFMohR3aJ9JYtfIIP25NkOtJzOwQQ\n\
+eJ7I18oPxKjhxe6kmu7NadcD2Lho7lwWJyXo55JIvuKfKlcP1FFC08sVLmzSIqEq\n\
+QbfKgiWRSocadz/sX4uDqaWg0QGBTzIQQhWC5AyBFWrCaK1WGC60wLkX2JGbvvRX\n\
+vDQgFQK7bwKBgAbiM6pW4SqbmQ9rZ1RYh7yHWwf9m6WZDfjpo07cJ6GS0H7pRDOD\n\
+D4S/8V/lTeeat185xMTopOqnaXxNrQVRRjgW7kethPGJKEwbAIo6RvHVwF1/K1jO\n\
+dIR278Ivt7RJCpwN9LYaiDc2AkgvC6vL9MoxTq84f2wIrwDb77KgdRlRAoGAJto6\n\
+f2ME6wTE6TQQu80Vc3zuFU/HmDJlfb3aSGzLCMrUJRc6Erf9JwCcBMUgrod4HmH/\n\
+hmjJnZAM7CaT3aoVj2BkZLuvdsqfDc7BJqr8LyYLdvtV3guEXSQAZLFwY4cyrqPo\n\
+y9KcaILJdqTer9+6raZll776DkPatsWDXWPnEv8CgYEArXmRBpTf/f4Emu7wk8Dn\n\
+ZvWDaeDatH/iCS6DzS9ZGsIwaBk0C1CKZfE9vjfW4TCs79mowdVsP8LLdcEGva8A\n\
+SO9u/JAbum//Pcn0HuPwNT7W3o2nai/u5MYp670H2Y9PYNc8wIrkf1Fswp0LDElw\n\
+LEcjyM3xY1lzeNnNR7YORnI=\n\
+-----END PRIVATE KEY-----";
+
 int main(void)
 {
+    mbedtls_x509_crt ctx_tmp;
+    mbedtls_x509_crt_init(&ctx_tmp);
+    mbedtls_x509_crt_parse(&ctx_tmp, crt_bl32, sizeof(crt_bl32));
+
+    char buf[100] = { 0 };
+    mbedtls_x509_dn_gets(buf, sizeof(buf), &(ctx_tmp.issuer));
+
+    mbedtls_pk_context key;
+    mbedtls_pk_init(&key);
+    mbedtls_pk_parse_key(&key, key_bl32, sizeof(key_bl32), NULL, 0);
+    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(key);
+
     const char name_manufacturer[] = "CN=the CN,O=Cool company,C=GER";
     const char name_bl1[] = "CN=BL1,O=AP Trusted ROM,C=GER";
     const char name_bl2[] = "CN=BL1,O=Trusted Boot Firmware,C=GER";
