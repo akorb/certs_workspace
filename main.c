@@ -34,7 +34,7 @@ int main(void)
 #define DFL_SUBJECT_NAME "CN=Cert,O=mbed TLS,C=UK"
 #define DFL_ISSUER_NAME "CN=CA,O=mbed TLS,C=UK"
 #define DFL_NOT_BEFORE "20230725000000"
-#define DFL_NOT_AFTER  "99991231235959"
+#define DFL_NOT_AFTER "99991231235959"
 #define DFL_SERIAL "1"
 #define DFL_SELFSIGN 0
 #define DFL_IS_CA 0
@@ -67,7 +67,7 @@ Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
 static const uint8_t certificate_policy_val_IDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x06};
 static const uint8_t certificate_policy_val_LDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x07};
 
-uint8_t attestation_extension_value_preface[] = {
+static const uint8_t attestation_extension_value_preface[] = {
     0x30, 0x31, 0xa6, 0x2f, 0x30, 0x2d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
     0x65, 0x03, 0x04, 0x02, 0x01, 0x04, 0x20};
 
@@ -75,7 +75,7 @@ uint8_t attestation_extension_value_preface[] = {
 #define TCI_LEN 32
 #define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
 
-const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
+static const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
 static const uint8_t tci_bl1[TCI_LEN] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
                                          0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
                                          0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
@@ -473,37 +473,47 @@ void verify()
     mbedtls_x509_crt_init(&ca);
     mbedtls_x509_crt_init(&chain);
 
-    do {
+    do
+    {
         r = mbedtls_x509_crt_parse_file(&ca, "manufacturer.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         r = mbedtls_x509_crt_parse_file(&chain, "bl1.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         r = mbedtls_x509_crt_parse_file(&chain, "bl2.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         r = mbedtls_x509_crt_parse_file(&chain, "bl31.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         r = mbedtls_x509_crt_parse_file(&chain, "bl32.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         r = mbedtls_x509_crt_parse_file(&chain, "ekcert.crt");
-        if (EXIT_SUCCESS != r) break;
+        if (EXIT_SUCCESS != r)
+            break;
 
         if ((r = mbedtls_x509_crt_verify(&chain, &ca, NULL, NULL, &flags,
-                                         NULL, NULL)) != 0) {
+                                         NULL, NULL)) != 0)
+        {
             char vrfy_buf[512];
             mbedtls_printf(" failed\n");
             mbedtls_x509_crt_verify_info(vrfy_buf, sizeof(vrfy_buf), "  ! ", flags);
             mbedtls_printf("%s\n", vrfy_buf);
-        } else
+        }
+        else
             mbedtls_printf(" Verify OK\n");
 
     } while (0);
 
-    if (0 != r) mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
+    if (0 != r)
+        mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
 }
 
 int main(void)
