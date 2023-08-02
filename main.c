@@ -551,11 +551,11 @@ int main(void)
     mbedtls_pk_parse_key(&key, key_bl32, sizeof(key_bl32), NULL, 0);
     mbedtls_rsa_context *rsa = mbedtls_pk_rsa(key);
 
-    const char name_manufacturer[] = "CN=the CN,O=Cool company,C=GER";
+    const char name_manufacturer[] = "CN=Manufacturer,O=Cool company,C=GER";
     const char name_bl1[] = "CN=BL1,O=AP Trusted ROM,C=GER";
-    const char name_bl2[] = "CN=BL1,O=Trusted Boot Firmware,C=GER";
-    const char name_bl31[] = "CN=BL1,O=EL3 Runtime Software,C=GER";
-    const char name_bl32[] = "CN=BL1,O=OP-TEE OS,C=GER";
+    const char name_bl2[] = "CN=BL2,O=Trusted Boot Firmware,C=GER";
+    const char name_bl31[] = "CN=BL31,O=EL3 Runtime Software,C=GER";
+    const char name_bl32[] = "CN=BL32,O=OP-TEE OS,C=GER";
     const char name_ekcert[] = "CN=EKCert,O=TPM EK,C=GER";
 
     cert_info cis[6];
