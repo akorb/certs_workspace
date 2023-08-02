@@ -2,3 +2,4 @@
 main
 *.crt
 *.pem
+*.der
