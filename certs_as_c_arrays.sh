@@ -9,6 +9,9 @@ print_ascii_file ()
     tail -n 1 $1.$2 | awk '$0=$0"\";"'
 }
 
+print_ascii_file manufacturer crt crt_
+echo ''
+
 print_ascii_file bl1 crt crt_
 echo ''
 
