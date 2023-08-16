@@ -9,4 +9,7 @@ all:
 	$(CC) -o main $(CFLAGS) $(LDFLAGS) $(ASN_MODULE_CFLAGS) $(ASN_MODULE_SRCS) main.c
 
 clean:
-	rm -f *.crt *.pem  main
+	rm -f *.crt main
+
+clean-all: clean
+	rm -f *.pem
