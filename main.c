@@ -24,9 +24,16 @@ int main(void)
 
 #include <DiceTcbInfo.h>
 
+// Generated during `make`
+#include "TCIs.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+
+#define CERTS_OUTPUT_FOLDER "certs_out"
+#define KEYS_INPUT_FOLDER "keys_in"
 
 #define DFL_SUBJECT_KEY "subject.key"
 #define DFL_ISSUER_KEY "ca.key"
@@ -76,10 +83,6 @@ const asn_oid_arc_t sha256_oid[] = {2, 16, 840, 1, 101, 3, 4, 2, 1};
 
 // ASN1 encoded
 static const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
-static const uint8_t tci_bl1[] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
-                                  0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
-                                  0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
-                                  0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
 
 /*
  * global options
@@ -106,6 +109,7 @@ typedef struct cert_info
     unsigned char ns_cert_type; /* NS cert type                         */
     const uint8_t *certificate_policy_val;
     const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
+    int tci_len;        /* Trused Componentent Identifier aka Firmware ID (FWID)*/
 } cert_info;
 
 static int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
@@ -410,7 +414,7 @@ static int create_certificate(cert_info ci)
 
         uint8_t out_buf[128];
 
-        int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), tci_bl1, sizeof(tci_bl1));
+        int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), ci.tci, ci.tci_len);
         if (data_size <= 0)
         {
             mbedtls_printf("Failed to create DICE attestation extension. Return value: %d\n", data_size);
@@ -463,27 +467,23 @@ static void verify()
 
     do
     {
-        r = mbedtls_x509_crt_parse_file(&ca, "manufacturer.crt");
+        r = mbedtls_x509_crt_parse_file(&ca, CERTS_OUTPUT_FOLDER "/manufacturer.crt");
         if (EXIT_SUCCESS != r)
             break;
 
-        r = mbedtls_x509_crt_parse_file(&chain, "bl1.crt");
+        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl1.crt");
         if (EXIT_SUCCESS != r)
             break;
 
-        r = mbedtls_x509_crt_parse_file(&chain, "bl2.crt");
+        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl2.crt");
         if (EXIT_SUCCESS != r)
             break;
 
-        r = mbedtls_x509_crt_parse_file(&chain, "bl31.crt");
+        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl31.crt");
         if (EXIT_SUCCESS != r)
             break;
 
-        r = mbedtls_x509_crt_parse_file(&chain, "bl32.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        r = mbedtls_x509_crt_parse_file(&chain, "ekcert.crt");
+        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl32.crt");
         if (EXIT_SUCCESS != r)
             break;
 
@@ -500,11 +500,29 @@ static void verify()
 
     } while (0);
 
-    if (0 != r)
-        mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
-    
+    if (r != 0)
+    {
+        char buf[256];
+        mbedtls_strerror(r, buf, sizeof(buf));
+        mbedtls_printf(" failed\n  !  mbedtls_x509_crt_parse_file -0x%04x - %s\n\n",
+                       (unsigned int)-r, buf);
+        mbedtls_printf("Flags: %u\n", r, flags);
+    }
+
     mbedtls_x509_crt_free(&ca);
     mbedtls_x509_crt_free(&chain);
+}
+
+static int ensureOutFolderExists()
+{
+    struct stat st;
+    if (stat(CERTS_OUTPUT_FOLDER, &st) == -1)
+        if (mkdir(CERTS_OUTPUT_FOLDER, 0755) == -1)
+        {
+            perror("mkdir");
+            return 1;
+        }
+    return 0;
 }
 
 int main(void)
@@ -516,18 +534,20 @@ int main(void)
     const char name_bl32[] = "CN=BL32,O=OP-TEE OS,C=GER";
     const char name_ekcert[] = "CN=EKCert,O=TPM EK,C=GER";
 
-    cert_info cis[6];
+    cert_info cis[5];
     memset(cis, 0, sizeof(cis));
     cert_info *cert_info_manufacturer = &cis[0];
     cert_info *cert_info_bl1 = &cis[1];
     cert_info *cert_info_bl2 = &cis[2];
     cert_info *cert_info_bl31 = &cis[3];
     cert_info *cert_info_bl32 = &cis[4];
-    cert_info *cert_info_ekcert = &cis[5];
 
-    cert_info_manufacturer->subject_key = "manufacturer.pem";
-    cert_info_manufacturer->issuer_key = "manufacturer.pem";
-    cert_info_manufacturer->output_file = "manufacturer.crt";
+    if (ensureOutFolderExists() != 0)
+        return 1;
+
+    cert_info_manufacturer->subject_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
+    cert_info_manufacturer->issuer_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
+    cert_info_manufacturer->output_file = CERTS_OUTPUT_FOLDER "/manufacturer.crt";
     cert_info_manufacturer->subject_name = name_manufacturer;
     cert_info_manufacturer->issuer_name = name_manufacturer;
     cert_info_manufacturer->not_before = DFL_NOT_BEFORE;
@@ -544,9 +564,9 @@ int main(void)
     cert_info_manufacturer->authority_identifier = DFL_AUTH_IDENT;
     cert_info_manufacturer->basic_constraints = DFL_CONSTRAINTS;
 
-    cert_info_bl1->subject_key = "bl1.pem";
-    cert_info_bl1->issuer_key = "manufacturer.pem";
-    cert_info_bl1->output_file = "bl1.crt";
+    cert_info_bl1->subject_key = KEYS_INPUT_FOLDER "/bl1.pem";
+    cert_info_bl1->issuer_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
+    cert_info_bl1->output_file = CERTS_OUTPUT_FOLDER "/bl1.crt";
     cert_info_bl1->subject_name = name_bl1;
     cert_info_bl1->issuer_name = name_manufacturer;
     cert_info_bl1->not_before = DFL_NOT_BEFORE;
@@ -564,10 +584,11 @@ int main(void)
     cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl1->certificate_policy_val = certificate_policy_val_IDevID;
     cert_info_bl1->tci = tci_bl1;
+    cert_info_bl1->tci_len = sizeof(tci_bl1);
 
-    cert_info_bl2->subject_key = "bl2.pem";
-    cert_info_bl2->issuer_key = "bl1.pem";
-    cert_info_bl2->output_file = "bl2.crt";
+    cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
+    cert_info_bl2->issuer_key = KEYS_INPUT_FOLDER "/bl1.pem";
+    cert_info_bl2->output_file = CERTS_OUTPUT_FOLDER "/bl2.crt";
     cert_info_bl2->subject_name = name_bl2;
     cert_info_bl2->issuer_name = name_bl1;
     cert_info_bl2->not_before = DFL_NOT_BEFORE;
@@ -584,11 +605,12 @@ int main(void)
     cert_info_bl2->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl2->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl2->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl2->tci = tci_bl1;
+    cert_info_bl2->tci = tci_bl2;
+    cert_info_bl2->tci_len = sizeof(tci_bl2);
 
-    cert_info_bl31->subject_key = "bl31.pem";
-    cert_info_bl31->issuer_key = "bl2.pem";
-    cert_info_bl31->output_file = "bl31.crt";
+    cert_info_bl31->subject_key = KEYS_INPUT_FOLDER "/bl31.pem";
+    cert_info_bl31->issuer_key = KEYS_INPUT_FOLDER "/bl2.pem";
+    cert_info_bl31->output_file = CERTS_OUTPUT_FOLDER "/bl31.crt";
     cert_info_bl31->subject_name = name_bl31;
     cert_info_bl31->issuer_name = name_bl2;
     cert_info_bl31->not_before = DFL_NOT_BEFORE;
@@ -605,11 +627,12 @@ int main(void)
     cert_info_bl31->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl31->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl31->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl31->tci = tci_bl1;
+    cert_info_bl31->tci = tci_bl31;
+    cert_info_bl31->tci_len = sizeof(tci_bl31);
 
-    cert_info_bl32->subject_key = "bl32.pem";
-    cert_info_bl32->issuer_key = "bl31.pem";
-    cert_info_bl32->output_file = "bl32.crt";
+    cert_info_bl32->subject_key = KEYS_INPUT_FOLDER "/bl32.pem";
+    cert_info_bl32->issuer_key = KEYS_INPUT_FOLDER "/bl31.pem";
+    cert_info_bl32->output_file = CERTS_OUTPUT_FOLDER "/bl32.crt";
     cert_info_bl32->subject_name = name_bl32;
     cert_info_bl32->issuer_name = name_bl31;
     cert_info_bl32->not_before = DFL_NOT_BEFORE;
@@ -626,28 +649,8 @@ int main(void)
     cert_info_bl32->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl32->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl32->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl32->tci = tci_bl1;
-
-    cert_info_ekcert->subject_key = "ekcert.pem";
-    cert_info_ekcert->issuer_key = "bl32.pem";
-    cert_info_ekcert->output_file = "ekcert.crt";
-    cert_info_ekcert->subject_name = name_ekcert;
-    cert_info_ekcert->issuer_name = name_bl32;
-    cert_info_ekcert->not_before = DFL_NOT_BEFORE;
-    cert_info_ekcert->not_after = DFL_NOT_AFTER;
-    cert_info_ekcert->serial = DFL_SERIAL;
-    cert_info_ekcert->selfsign = 0;
-    cert_info_ekcert->is_ca = 0;
-    cert_info_ekcert->max_pathlen = DFL_MAX_PATHLEN;
-    cert_info_ekcert->key_usage = MBEDTLS_X509_KU_KEY_CERT_SIGN;
-    cert_info_ekcert->ns_cert_type = DFL_NS_CERT_TYPE;
-    cert_info_ekcert->version = DFL_VERSION - 1;
-    cert_info_ekcert->md = DFL_DIGEST;
-    cert_info_ekcert->subject_identifier = DFL_SUBJ_IDENT;
-    cert_info_ekcert->authority_identifier = DFL_AUTH_IDENT;
-    cert_info_ekcert->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_ekcert->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_ekcert->tci = tci_bl1;
+    cert_info_bl32->tci = tci_bl32;
+    cert_info_bl32->tci_len = sizeof(tci_bl32);
 
     int exit_code;
     for (int i = 0; i < sizeof(cis) / sizeof(cis[0]); i++)
