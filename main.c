@@ -573,8 +573,7 @@ int main(void)
     cert_info_bl1->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl1->certificate_policy_val = certificate_policy_val_IDevID;
-    cert_info_bl1->tci = tci_bl1;
-    cert_info_bl1->tci_len = sizeof(tci_bl1);
+    cert_info_bl1->tci = NULL;
 
     cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
     cert_info_bl2->issuer_key = KEYS_INPUT_FOLDER "/bl1.pem";
