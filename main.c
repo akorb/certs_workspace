@@ -8,10 +8,10 @@
     !defined(MBEDTLS_PEM_WRITE_C)
 int main(void)
 {
-    mbedtls_printf("MBEDTLS_X509_CRT_WRITE_C and/or MBEDTLS_X509_CRT_PARSE_C and/or "
-                   "MBEDTLS_FS_IO and/or MBEDTLS_SHA256_C and/or "
-                   "MBEDTLS_ENTROPY_C and/or MBEDTLS_CTR_DRBG_C and/or "
-                   "MBEDTLS_ERROR_C not defined.\n");
+    printf("MBEDTLS_X509_CRT_WRITE_C and/or MBEDTLS_X509_CRT_PARSE_C and/or "
+           "MBEDTLS_FS_IO and/or MBEDTLS_SHA256_C and/or "
+           "MBEDTLS_ENTROPY_C and/or MBEDTLS_CTR_DRBG_C and/or "
+           "MBEDTLS_ERROR_C not defined.\n");
     mbedtls_exit(0);
 }
 #else
@@ -32,21 +32,15 @@ int main(void)
 #include <string.h>
 #include <sys/stat.h>
 
+#define ARRAY_LEN(array) (sizeof(array) / sizeof(array[0]))
+
 #define CERTS_OUTPUT_FOLDER "certs_out"
 #define KEYS_INPUT_FOLDER "keys_in"
 
-#define DFL_SUBJECT_KEY "subject.key"
-#define DFL_ISSUER_KEY "ca.key"
-#define DFL_OUTPUT_FILENAME "cert.crt"
-#define DFL_SUBJECT_NAME "CN=Cert,O=mbed TLS,C=UK"
-#define DFL_ISSUER_NAME "CN=CA,O=mbed TLS,C=UK"
 #define DFL_NOT_BEFORE "20230725000000"
 #define DFL_NOT_AFTER "99991231235959"
 #define DFL_SERIAL "1"
-#define DFL_SELFSIGN 0
-#define DFL_IS_CA 0
 #define DFL_MAX_PATHLEN -1
-#define DFL_KEY_USAGE 0
 #define DFL_NS_CERT_TYPE 0
 #define DFL_VERSION 3
 #define DFL_AUTH_IDENT 1
@@ -71,7 +65,7 @@ Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
     ]
 }
 */
-// ASN1 encoded
+// ASN.1 encoded
 static const uint8_t certificate_policy_val_IDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x06};
 static const uint8_t certificate_policy_val_LDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x07};
 
@@ -81,7 +75,7 @@ const asn_oid_arc_t sha256_oid[] = {2, 16, 840, 1, 101, 3, 4, 2, 1};
 
 #define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
 
-// ASN1 encoded
+// ASN.1 encoded
 static const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
 
 /*
@@ -111,6 +105,14 @@ typedef struct cert_info
     const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
     int tci_len;        /* Trused Componentent Identifier aka Firmware ID (FWID)*/
 } cert_info;
+
+static const char certficate_names[][64] = {
+    CERTS_OUTPUT_FOLDER "/manufacturer.crt",
+    CERTS_OUTPUT_FOLDER "/bl1.crt",
+    CERTS_OUTPUT_FOLDER "/bl2.crt",
+    CERTS_OUTPUT_FOLDER "/bl31.crt",
+    CERTS_OUTPUT_FOLDER "/bl32.crt",
+};
 
 static int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
 {
@@ -175,7 +177,7 @@ static int create_certificate(cert_info ci)
     mbedtls_pk_context loaded_issuer_key, loaded_subject_key;
     mbedtls_pk_context *issuer_key = &loaded_issuer_key,
                        *subject_key = &loaded_subject_key;
-    char buf[1024];
+    char buf[256];
     mbedtls_x509write_cert crt;
     mbedtls_mpi serial;
 
@@ -186,63 +188,60 @@ static int create_certificate(cert_info ci)
     mbedtls_pk_init(&loaded_issuer_key);
     mbedtls_pk_init(&loaded_subject_key);
     mbedtls_mpi_init(&serial);
-    memset(buf, 0, 1024);
-
-    mbedtls_printf("\n");
 
     // Parse serial to MPI
     //
-    mbedtls_printf("  . Reading serial number...");
+    printf("Reading serial number...");
     fflush(stdout);
 
     if ((ret = mbedtls_mpi_read_string(&serial, 10, ci.serial)) != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_mpi_read_string "
-                       "returned -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_mpi_read_string "
+               "returned -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
-    mbedtls_printf(" ok\n");
+    printf(" ok\n");
 
     /*
      * 1.1. Load the keys
      */
     if (!ci.selfsign)
     {
-        mbedtls_printf("  . Loading the subject key ...");
+        printf("Loading the subject key ...");
         fflush(stdout);
 
         ret = mbedtls_pk_parse_keyfile(&loaded_subject_key, ci.subject_key,
                                        NULL);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  mbedtls_pk_parse_keyfile "
-                           "returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  mbedtls_pk_parse_keyfile "
+                   "returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
-    mbedtls_printf("  . Loading the issuer key ...");
+    printf("Loading the issuer key ...");
     fflush(stdout);
 
     ret = mbedtls_pk_parse_keyfile(&loaded_issuer_key, ci.issuer_key,
                                    NULL);
     if (ret != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_pk_parse_keyfile "
-                       "returned -x%02x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_pk_parse_keyfile "
+               "returned -x%02x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
-    mbedtls_printf(" ok\n");
+    printf(" ok\n");
 
     if (ci.selfsign)
     {
@@ -258,23 +257,23 @@ static int create_certificate(cert_info ci)
      */
     if ((ret = mbedtls_x509write_crt_set_subject_name(&crt, ci.subject_name)) != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_subject_name "
-                       "returned -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_x509write_crt_set_subject_name "
+               "returned -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
     if ((ret = mbedtls_x509write_crt_set_issuer_name(&crt, ci.issuer_name)) != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_issuer_name "
-                       "returned -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_x509write_crt_set_issuer_name "
+               "returned -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
-    mbedtls_printf("  . Setting certificate values ...");
+    printf("Setting certificate values ...");
     fflush(stdout);
 
     mbedtls_x509write_crt_set_version(&crt, ci.version);
@@ -283,164 +282,165 @@ static int create_certificate(cert_info ci)
     ret = mbedtls_x509write_crt_set_serial(&crt, &serial);
     if (ret != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_serial "
-                       "returned -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_x509write_crt_set_serial "
+               "returned -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
     ret = mbedtls_x509write_crt_set_validity(&crt, ci.not_before, ci.not_after);
     if (ret != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_validity "
-                       "returned -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  mbedtls_x509write_crt_set_validity "
+               "returned -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
-    mbedtls_printf(" ok\n");
+    printf(" ok\n");
 
     if (ci.version == MBEDTLS_X509_CRT_VERSION_3 &&
         ci.basic_constraints != 0)
     {
-        mbedtls_printf("  . Adding the Basic Constraints extension ...");
+        printf("Adding the Basic Constraints extension ...");
         fflush(stdout);
 
         ret = mbedtls_x509write_crt_set_basic_constraints(&crt, ci.is_ca,
                                                           ci.max_pathlen);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  x509write_crt_set_basic_constraints "
-                           "returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  x509write_crt_set_basic_constraints "
+                   "returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
 #if defined(MBEDTLS_SHA1_C)
     if (ci.version == MBEDTLS_X509_CRT_VERSION_3 &&
         ci.subject_identifier != 0)
     {
-        mbedtls_printf("  . Adding the Subject Key Identifier ...");
+        printf("Adding the Subject Key Identifier ...");
         fflush(stdout);
 
         ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_subject"
-                           "_key_identifier returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  mbedtls_x509write_crt_set_subject"
+                   "_key_identifier returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
     if (ci.version == MBEDTLS_X509_CRT_VERSION_3 &&
         ci.authority_identifier != 0)
     {
-        mbedtls_printf("  . Adding the Authority Key Identifier ...");
+        printf("Adding the Authority Key Identifier ...");
         fflush(stdout);
 
         ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_authority_"
-                           "key_identifier returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  mbedtls_x509write_crt_set_authority_"
+                   "key_identifier returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 #endif /* MBEDTLS_SHA1_C */
 
     if (ci.version == MBEDTLS_X509_CRT_VERSION_3 &&
         ci.key_usage != 0)
     {
-        mbedtls_printf("  . Adding the Key Usage extension ...");
+        printf("Adding the Key Usage extension ...");
         fflush(stdout);
 
         ret = mbedtls_x509write_crt_set_key_usage(&crt, ci.key_usage);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_key_usage "
-                           "returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  mbedtls_x509write_crt_set_key_usage "
+                   "returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
     if (ci.version == MBEDTLS_X509_CRT_VERSION_3 &&
         ci.ns_cert_type != 0)
     {
-        mbedtls_printf("  . Adding the NS Cert Type extension ...");
+        printf("Adding the NS Cert Type extension ...");
         fflush(stdout);
 
         ret = mbedtls_x509write_crt_set_ns_cert_type(&crt, ci.ns_cert_type);
         if (ret != 0)
         {
-            mbedtls_strerror(ret, buf, 1024);
-            mbedtls_printf(" failed\n  !  mbedtls_x509write_crt_set_ns_cert_type "
-                           "returned -0x%04x - %s\n\n",
-                           (unsigned int)-ret, buf);
+            mbedtls_strerror(ret, buf, sizeof(buf));
+            printf(" failed\n  !  mbedtls_x509write_crt_set_ns_cert_type "
+                   "returned -0x%04x - %s\n\n",
+                   (unsigned int)-ret, buf);
             goto exit;
         }
 
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
     if (ci.certificate_policy_val)
     {
-        mbedtls_printf("  . Add certificate policy extension...");
+        printf("Add certificate policy extension...");
 
         mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy_val, CERTIFICATE_POLICY_VAL_LEN);
-        mbedtls_printf(" ok\n");
+        printf(" ok\n");
     }
 
     if (ci.tci)
     {
-        mbedtls_printf("  . Add DICE attestation extension...");
+        printf("Add DICE attestation extension...");
 
         uint8_t out_buf[128];
 
         int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), ci.tci, ci.tci_len);
         if (data_size <= 0)
         {
-            mbedtls_printf("Failed to create DICE attestation extension. Return value: %d\n", data_size);
+            printf("Failed to create DICE attestation extension. Return value: %d\n", data_size);
         }
         else
         {
             mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, out_buf, data_size);
-            mbedtls_printf(" ok\n");
+            printf(" ok\n");
         }
     }
 
     /*
      * 1.2. Writing the certificate
      */
-    mbedtls_printf("  . Writing the certificate...");
+    printf("Writing the certificate...");
     fflush(stdout);
 
     if ((ret = write_certificate(&crt, ci.output_file)) != 0)
     {
-        mbedtls_strerror(ret, buf, 1024);
-        mbedtls_printf(" failed\n  !  write_certificate -0x%04x - %s\n\n",
-                       (unsigned int)-ret, buf);
+        mbedtls_strerror(ret, buf, sizeof(buf));
+        printf(" failed\n  !  write_certificate -0x%04x - %s\n\n",
+               (unsigned int)-ret, buf);
         goto exit;
     }
 
-    mbedtls_printf(" ok\n");
+    printf(" ok\n");
+    printf("\n");
 
     exit_code = MBEDTLS_EXIT_SUCCESS;
 
@@ -465,49 +465,39 @@ static void verify()
     mbedtls_x509_crt_init(&ca);
     mbedtls_x509_crt_init(&chain);
 
-    do
-    {
-        r = mbedtls_x509_crt_parse_file(&ca, CERTS_OUTPUT_FOLDER "/manufacturer.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl1.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl2.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl31.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        r = mbedtls_x509_crt_parse_file(&chain, CERTS_OUTPUT_FOLDER "/bl32.crt");
-        if (EXIT_SUCCESS != r)
-            break;
-
-        if ((r = mbedtls_x509_crt_verify(&chain, &ca, NULL, NULL, &flags,
-                                         NULL, NULL)) != 0)
-        {
-            char vrfy_buf[512];
-            mbedtls_printf(" failed\n");
-            mbedtls_x509_crt_verify_info(vrfy_buf, sizeof(vrfy_buf), "  ! ", flags);
-            mbedtls_printf("%s\n", vrfy_buf);
-        }
-        else
-            mbedtls_printf(" Verify OK\n");
-
-    } while (0);
-
+    r = mbedtls_x509_crt_parse_file(&ca, certficate_names[0]);
     if (r != 0)
     {
         char buf[256];
         mbedtls_strerror(r, buf, sizeof(buf));
-        mbedtls_printf(" failed\n  !  mbedtls_x509_crt_parse_file -0x%04x - %s\n\n",
-                       (unsigned int)-r, buf);
-        mbedtls_printf("Flags: %u\n", r, flags);
+        printf("Failed to parse %s\nmbedtls_x509_crt_parse_file -0x%04x - %s\n\n",
+               certficate_names[0], (unsigned int)-r, buf);
     }
+
+    for (int i = 1; i < ARRAY_LEN(certficate_names); i++)
+    {
+        r = mbedtls_x509_crt_parse_file(&chain, certficate_names[i]);
+        if (r != 0)
+        {
+            char buf[256];
+            mbedtls_strerror(r, buf, sizeof(buf));
+            printf("Failed to parse %s\nmbedtls_x509_crt_parse_file -0x%04x - %s\n\n",
+                   certficate_names[i], (unsigned int)-r, buf);
+        }
+    }
+
+    printf("Verifying signatures of certificate chain...");
+    fflush(stdout);
+    if ((r = mbedtls_x509_crt_verify(&chain, &ca, NULL, NULL, &flags,
+                                     NULL, NULL)) != 0)
+    {
+        char vrfy_buf[512];
+        printf(" failed\n");
+        mbedtls_x509_crt_verify_info(vrfy_buf, sizeof(vrfy_buf), "", flags);
+        printf("%s\n", vrfy_buf);
+    }
+    else
+        printf(" ok\n");
 
     mbedtls_x509_crt_free(&ca);
     mbedtls_x509_crt_free(&chain);
@@ -547,7 +537,7 @@ int main(void)
 
     cert_info_manufacturer->subject_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
     cert_info_manufacturer->issuer_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
-    cert_info_manufacturer->output_file = CERTS_OUTPUT_FOLDER "/manufacturer.crt";
+    cert_info_manufacturer->output_file = certficate_names[0];
     cert_info_manufacturer->subject_name = name_manufacturer;
     cert_info_manufacturer->issuer_name = name_manufacturer;
     cert_info_manufacturer->not_before = DFL_NOT_BEFORE;
@@ -566,7 +556,7 @@ int main(void)
 
     cert_info_bl1->subject_key = KEYS_INPUT_FOLDER "/bl1.pem";
     cert_info_bl1->issuer_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
-    cert_info_bl1->output_file = CERTS_OUTPUT_FOLDER "/bl1.crt";
+    cert_info_bl1->output_file = certficate_names[1];
     cert_info_bl1->subject_name = name_bl1;
     cert_info_bl1->issuer_name = name_manufacturer;
     cert_info_bl1->not_before = DFL_NOT_BEFORE;
@@ -588,7 +578,7 @@ int main(void)
 
     cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
     cert_info_bl2->issuer_key = KEYS_INPUT_FOLDER "/bl1.pem";
-    cert_info_bl2->output_file = CERTS_OUTPUT_FOLDER "/bl2.crt";
+    cert_info_bl2->output_file = certficate_names[2];
     cert_info_bl2->subject_name = name_bl2;
     cert_info_bl2->issuer_name = name_bl1;
     cert_info_bl2->not_before = DFL_NOT_BEFORE;
@@ -610,7 +600,7 @@ int main(void)
 
     cert_info_bl31->subject_key = KEYS_INPUT_FOLDER "/bl31.pem";
     cert_info_bl31->issuer_key = KEYS_INPUT_FOLDER "/bl2.pem";
-    cert_info_bl31->output_file = CERTS_OUTPUT_FOLDER "/bl31.crt";
+    cert_info_bl31->output_file = certficate_names[3];
     cert_info_bl31->subject_name = name_bl31;
     cert_info_bl31->issuer_name = name_bl2;
     cert_info_bl31->not_before = DFL_NOT_BEFORE;
@@ -632,7 +622,7 @@ int main(void)
 
     cert_info_bl32->subject_key = KEYS_INPUT_FOLDER "/bl32.pem";
     cert_info_bl32->issuer_key = KEYS_INPUT_FOLDER "/bl31.pem";
-    cert_info_bl32->output_file = CERTS_OUTPUT_FOLDER "/bl32.crt";
+    cert_info_bl32->output_file = certficate_names[4];
     cert_info_bl32->subject_name = name_bl32;
     cert_info_bl32->issuer_name = name_bl31;
     cert_info_bl32->not_before = DFL_NOT_BEFORE;
@@ -653,7 +643,7 @@ int main(void)
     cert_info_bl32->tci_len = sizeof(tci_bl32);
 
     int exit_code;
-    for (int i = 0; i < sizeof(cis) / sizeof(cis[0]); i++)
+    for (int i = 0; i < ARRAY_LEN(cis); i++)
     {
         exit_code = create_certificate(cis[i]);
         if (exit_code != 0)
