@@ -9,19 +9,19 @@ print_ascii_file ()
     tail -n 1 $1.$2 | awk '$0=$0"\";"'
 }
 
-print_ascii_file manufacturer crt crt_
+print_ascii_file certs_out/manufacturer crt crt_
 echo ''
 
-print_ascii_file bl1 crt crt_
+print_ascii_file certs_out/bl1 crt crt_
 echo ''
 
-print_ascii_file bl2 crt crt_
+print_ascii_file certs_out/bl2 crt crt_
 echo ''
 
-print_ascii_file bl31 crt crt_
+print_ascii_file certs_out/bl31 crt crt_
 echo ''
 
-print_ascii_file bl32 crt crt_
+print_ascii_file certs_out/bl32 crt crt_
 echo ''
 
-print_ascii_file bl32 pem key_
+print_ascii_file keys_in/bl32 pem key_
