@@ -1,0 +1,85 @@
+ASN_MODULE_SRCS=	\
+	gen/DiceTcbInfo.c	\
+	gen/FWIDLIST.c	\
+	gen/FWID.c	\
+	gen/OperationalFlags.c
+
+ASN_MODULE_HDRS=	\
+	gen/DiceTcbInfo.h	\
+	gen/FWIDLIST.h	\
+	gen/FWID.h	\
+	gen/OperationalFlags.h
+
+ASN_MODULE_HDRS+=gen/OPEN_TYPE.h
+ASN_MODULE_SRCS+=gen/OPEN_TYPE.c
+ASN_MODULE_HDRS+=gen/constr_CHOICE.h
+ASN_MODULE_HDRS+=gen/INTEGER.h
+ASN_MODULE_SRCS+=gen/INTEGER.c
+ASN_MODULE_HDRS+=gen/NativeInteger.h
+ASN_MODULE_SRCS+=gen/NativeInteger.c
+ASN_MODULE_HDRS+=gen/OBJECT_IDENTIFIER.h
+ASN_MODULE_SRCS+=gen/OBJECT_IDENTIFIER.c
+ASN_MODULE_HDRS+=gen/OCTET_STRING.h
+ASN_MODULE_HDRS+=gen/UTF8String.h
+ASN_MODULE_SRCS+=gen/UTF8String.c
+ASN_MODULE_HDRS+=gen/asn_SEQUENCE_OF.h
+ASN_MODULE_SRCS+=gen/asn_SEQUENCE_OF.c
+ASN_MODULE_HDRS+=gen/asn_SET_OF.h
+ASN_MODULE_SRCS+=gen/asn_SET_OF.c
+ASN_MODULE_SRCS+=gen/constr_CHOICE.c
+ASN_MODULE_HDRS+=gen/constr_SEQUENCE.h
+ASN_MODULE_SRCS+=gen/constr_SEQUENCE.c
+ASN_MODULE_HDRS+=gen/constr_SEQUENCE_OF.h
+ASN_MODULE_SRCS+=gen/constr_SEQUENCE_OF.c
+ASN_MODULE_HDRS+=gen/constr_SET_OF.h
+ASN_MODULE_SRCS+=gen/constr_SET_OF.c
+ASN_MODULE_HDRS+=gen/asn_application.h
+ASN_MODULE_SRCS+=gen/asn_application.c
+ASN_MODULE_HDRS+=gen/asn_ioc.h
+ASN_MODULE_HDRS+=gen/asn_system.h
+ASN_MODULE_HDRS+=gen/asn_codecs.h
+ASN_MODULE_HDRS+=gen/asn_internal.h
+ASN_MODULE_SRCS+=gen/asn_internal.c
+ASN_MODULE_HDRS+=gen/asn_random_fill.h
+ASN_MODULE_SRCS+=gen/asn_random_fill.c
+ASN_MODULE_HDRS+=gen/asn_bit_data.h
+ASN_MODULE_SRCS+=gen/asn_bit_data.c
+ASN_MODULE_SRCS+=gen/OCTET_STRING.c
+ASN_MODULE_HDRS+=gen/BIT_STRING.h
+ASN_MODULE_SRCS+=gen/BIT_STRING.c
+ASN_MODULE_SRCS+=gen/asn_codecs_prim.c
+ASN_MODULE_HDRS+=gen/asn_codecs_prim.h
+ASN_MODULE_HDRS+=gen/ber_tlv_length.h
+ASN_MODULE_SRCS+=gen/ber_tlv_length.c
+ASN_MODULE_HDRS+=gen/ber_tlv_tag.h
+ASN_MODULE_SRCS+=gen/ber_tlv_tag.c
+ASN_MODULE_HDRS+=gen/ber_decoder.h
+ASN_MODULE_SRCS+=gen/ber_decoder.c
+ASN_MODULE_HDRS+=gen/der_encoder.h
+ASN_MODULE_SRCS+=gen/der_encoder.c
+ASN_MODULE_HDRS+=gen/constr_TYPE.h
+ASN_MODULE_SRCS+=gen/constr_TYPE.c
+ASN_MODULE_HDRS+=gen/constraints.h
+ASN_MODULE_SRCS+=gen/constraints.c
+ASN_MODULE_HDRS+=gen/xer_support.h
+ASN_MODULE_SRCS+=gen/xer_support.c
+ASN_MODULE_HDRS+=gen/xer_decoder.h
+ASN_MODULE_SRCS+=gen/xer_decoder.c
+ASN_MODULE_HDRS+=gen/xer_encoder.h
+ASN_MODULE_SRCS+=gen/xer_encoder.c
+ASN_MODULE_HDRS+=gen/per_support.h
+ASN_MODULE_SRCS+=gen/per_support.c
+ASN_MODULE_HDRS+=gen/per_decoder.h
+ASN_MODULE_SRCS+=gen/per_decoder.c
+ASN_MODULE_HDRS+=gen/per_encoder.h
+ASN_MODULE_SRCS+=gen/per_encoder.c
+ASN_MODULE_HDRS+=gen/per_opentype.h
+ASN_MODULE_SRCS+=gen/per_opentype.c
+
+ASN_MODULE_CFLAGS=-DASN_DISABLE_OER_SUPPORT -DASN_DISABLE_PER_SUPPORT 
+
+lib_LTLIBRARIES+=libasncodec.la
+libasncodec_la_SOURCES=$(ASN_MODULE_SRCS) $(ASN_MODULE_HDRS)
+libasncodec_la_CPPFLAGS=-I$(top_srcdir)/gen/
+libasncodec_la_CFLAGS=$(ASN_MODULE_CFLAGS)
+libasncodec_la_LDFLAGS=-lm

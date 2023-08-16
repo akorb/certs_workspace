@@ -22,6 +22,8 @@ int main(void)
 #include "mbedtls/md.h"
 #include "mbedtls/error.h"
 
+#include <DiceTcbInfo.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,22 +64,22 @@ Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
     ]
 }
 */
+// ASN1 encoded
 static const uint8_t certificate_policy_val_IDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x06};
 static const uint8_t certificate_policy_val_LDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x07};
 
-static const uint8_t attestation_extension_value_preface[] = {
-    0x30, 0x31, 0xa6, 0x2f, 0x30, 0x2d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
-    0x65, 0x03, 0x04, 0x02, 0x01, 0x04, 0x20};
+// Raw values! Not encoded to ASN.1 yet
+// Therefore, usable for ASN1c generated code, but not for mbedtls code
+const asn_oid_arc_t sha256_oid[] = {2, 16, 840, 1, 101, 3, 4, 2, 1};
 
-// SHA256, 256 Bits = 32 Bytes
-#define TCI_LEN 32
 #define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
 
+// ASN1 encoded
 static const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
-static const uint8_t tci_bl1[TCI_LEN] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
-                                         0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
-                                         0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
-                                         0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
+static const uint8_t tci_bl1[] = {0x4c, 0xce, 0xfa, 0x68, 0x7d, 0x38, 0xbe, 0x8f,
+                                  0xe1, 0x85, 0xc0, 0xbf, 0x92, 0xb2, 0x8c, 0xdb,
+                                  0x69, 0xe8, 0x27, 0xe0, 0xe2, 0x39, 0x20, 0xbe,
+                                  0x2c, 0xcf, 0x4a, 0xb2, 0xba, 0x0d, 0xe9, 0x60};
 
 /*
  * global options
@@ -106,7 +108,7 @@ typedef struct cert_info
     const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
 } cert_info;
 
-int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
+static int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
 {
     int ret;
     FILE *f;
@@ -138,16 +140,31 @@ int write_certificate(mbedtls_x509write_cert *crt, const char *output_file)
     return 0;
 }
 
-// https://learn.microsoft.com/en-us/windows/win32/seccertenroll/about-object-identifier
-// This macro works only when each number is below 128
-// Otherwise, use this converter: https://misc.daniel-marschall.de/asn.1/oid-converter/online.php
-// Just remove the first two octets of the output, since they are ASN.1 encoding specific
-#define OID(o1, o2, ...)          \
-    {                             \
-        40 * o1 + o2, __VA_ARGS__ \
-    }
+static int generate_attestation_extension_data(uint8_t *output_buf, const size_t outbut_buf_len,
+                                               const asn_oid_arc_t *hash_type_oid, const size_t hash_type_oid_len,
+                                               const uint8_t *hash, const size_t hash_len)
+{
+    int ret;
+    DiceTcbInfo_t *tcbInfo = calloc(1, sizeof(*tcbInfo));
+    assert(tcbInfo);
 
-int create_certificate(cert_info ci)
+    FWID_t *fwid = calloc(1, sizeof(*fwid));
+    OBJECT_IDENTIFIER_set_arcs(&fwid->hashAlg, hash_type_oid, hash_type_oid_len / sizeof(hash_type_oid[0]));
+    fwid->digest.buf = malloc(hash_len);
+    memcpy(fwid->digest.buf, hash, hash_len);
+    fwid->digest.size = hash_len;
+
+    tcbInfo->fwids = calloc(1, sizeof(*tcbInfo->fwids));
+    ret = ASN_SEQUENCE_ADD(&tcbInfo->fwids->list, fwid);
+    assert(ret == 0);
+
+    asn_enc_rval_t ec = der_encode_to_buffer(&asn_DEF_DiceTcbInfo, tcbInfo, output_buf, outbut_buf_len);
+    ASN_STRUCT_FREE(asn_DEF_DiceTcbInfo, tcbInfo);
+
+    return ec.encoded;
+}
+
+static int create_certificate(cert_info ci)
 {
     int ret = 1;
     int exit_code = MBEDTLS_EXIT_FAILURE;
@@ -390,15 +407,19 @@ int create_certificate(cert_info ci)
     if (ci.tci)
     {
         mbedtls_printf("  . Add DICE attestation extension...");
-        uint8_t attestation_extension_value[sizeof(attestation_extension_value_preface) + TCI_LEN];
 
-        // Set preface
-        memcpy(attestation_extension_value, attestation_extension_value_preface, sizeof(attestation_extension_value_preface));
-        // Set TCI
-        memcpy(&attestation_extension_value[sizeof(attestation_extension_value_preface)], ci.tci, TCI_LEN);
+        uint8_t out_buf[128];
 
-        mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, attestation_extension_value, sizeof(attestation_extension_value));
-        mbedtls_printf(" ok\n");
+        int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), tci_bl1, sizeof(tci_bl1));
+        if (data_size <= 0)
+        {
+            mbedtls_printf("Failed to create DICE attestation extension. Return value: %d\n", data_size);
+        }
+        else
+        {
+            mbedtls_x509write_crt_set_extension(&crt, dice_attestation_oid, sizeof(dice_attestation_oid), 0, out_buf, data_size);
+            mbedtls_printf(" ok\n");
+        }
     }
 
     /*
@@ -428,7 +449,7 @@ exit:
     return exit_code;
 }
 
-void verify()
+static void verify()
 {
     // From https://stackoverflow.com/a/72722115/2050020
 
@@ -481,76 +502,13 @@ void verify()
 
     if (0 != r)
         mbedtls_printf("Error: 0x%04x; flag: %u\n", r, flags);
+    
+    mbedtls_x509_crt_free(&ca);
+    mbedtls_x509_crt_free(&chain);
 }
-
-static const uint8_t crt_bl32[] =
-"-----BEGIN CERTIFICATE-----\n\
-MIIDojCCAoqgAwIBAgIBATANBgkqhkiG9w0BAQsFADA7MQwwCgYDVQQDDANCTDEx\n\
-HTAbBgNVBAoMFEVMMyBSdW50aW1lIFNvZnR3YXJlMQwwCgYDVQQGEwNHRVIwIBcN\n\
-MjMwNzI1MDAwMDAwWhgPOTk5OTEyMzEyMzU5NTlaMDAxDDAKBgNVBAMMA0JMMTES\n\
-MBAGA1UECgwJT1AtVEVFIE9TMQwwCgYDVQQGEwNHRVIwggEiMA0GCSqGSIb3DQEB\n\
-AQUAA4IBDwAwggEKAoIBAQCZHmB/jGls35xWyGtguxIRIvaX1ncTBdKyrXPbBm5T\n\
-+7CraPLgQpLVhAN1oN67XOXNNLiaKCb0/I2MgLsq0+SI1YYPZU5nSRZ9rVVtTMym\n\
-8AtASwPjDOBJm/s6Hp9+Q8gxHazYEH9BCc2v6j9A3kjV6cslynaiwZvN4K+aix6k\n\
-1mdoTitJylhVN1k/1a2ZsFHicLPnWPtXgOoZ0PDdN6YLZbS0Ka6BdAEuKTVH/UHz\n\
-4bVz3eAsLM881cIHyAzhauPanpcs2FuAC6HOSn6AXPuTfiBcTuwFFw0PFVIGhZaW\n\
-/bptcc3elB60Mqy5EwjeJaV2C4/Bc4LoqqDFuJl8ES5jAgMBAAGjgbkwgbYwDwYD\n\
-VR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUG5tZTkK8L26sIIQ1mWTom4eb6t8wHwYD\n\
-VR0jBBgwFoAUs3Ke3i8pF+A9ceYDmcHSshvYnFIwDgYDVR0PAQH/BAQDAgIEMBQG\n\
-A1UdIAQNMAswCQYHZ4EFBQRkBzA9BgZngQUFBAEEMzAxpi8wLQYJYIZIAWUDBAIB\n\
-BCBMzvpofTi+j+GFwL+Ssozbaegn4OI5IL4sz0qyug3pYDANBgkqhkiG9w0BAQsF\n\
-AAOCAQEAgqPZLeICZ9AKjTK3V+NCv6LuPuvx9ZRTIPv3Tfwmr36qfCQ3G/cwAoUR\n\
-uzjr4XHl4ABFfiIB9DRzmQwkzpQuYWZtW+Z6zDZ4BpZwFnayaMXuAvk+uC/Z4D/V\n\
-GZCXBV25RodNpiYrrAJJPvOjStc82P5YOsqStOh07jtIcI0M33Vk20VrrKpQ/HTK\n\
-l2nwcziFaZBABpjRHjvFSFPUjeRzv8CVIKuaRUy8TOqLS2xOr2TW/u1i7urrYW3N\n\
-TnP85FFwP4YajI91iDzI9UTjRnrhe1k+wmNL/EaYt2Hm5N3bct5p0Mxeff1r87z7\n\
-ACi2j3Jaf1J94i2Wz6GlTRRBYYMuWw==\n\
------END CERTIFICATE-----";
-
-static const uint8_t key_bl32[] =
-"-----BEGIN PRIVATE KEY-----\n\
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCZHmB/jGls35xW\n\
-yGtguxIRIvaX1ncTBdKyrXPbBm5T+7CraPLgQpLVhAN1oN67XOXNNLiaKCb0/I2M\n\
-gLsq0+SI1YYPZU5nSRZ9rVVtTMym8AtASwPjDOBJm/s6Hp9+Q8gxHazYEH9BCc2v\n\
-6j9A3kjV6cslynaiwZvN4K+aix6k1mdoTitJylhVN1k/1a2ZsFHicLPnWPtXgOoZ\n\
-0PDdN6YLZbS0Ka6BdAEuKTVH/UHz4bVz3eAsLM881cIHyAzhauPanpcs2FuAC6HO\n\
-Sn6AXPuTfiBcTuwFFw0PFVIGhZaW/bptcc3elB60Mqy5EwjeJaV2C4/Bc4LoqqDF\n\
-uJl8ES5jAgMBAAECggEANbBIjsCpoLLBa06IFBlUCu0zAOeCxglHKT6XfoeBPPJm\n\
-Lpw0eTzupm5NFjwrjQ/URgFD702/5yv85/SlbC1zFyWjhZd0h9PBTpzt9M62fZxy\n\
-nX8QJFc596V5UBY3v3q94bbxiaszK5dn51RgDHtEl7kL8brNoWD4pBYyDKLWQl6e\n\
-eFyOpa3RQRny3cp02qK+QQjgmrdrSjP6rPzk6rF3FpypWhBU9iPPTw61+4YvRpK5\n\
-7ZtQfxtup9UPX5oepvARIxXt3nWExICr5yRfMObJ4IR9qnszR4/yXMccRtMHPrxF\n\
-t1V+iIy89QuBkfPyhXqs9nnlLBLbD1E6AjA3EEu4TQKBgQDG6ULiCWz6qxSodibM\n\
-9vqzmBsEIrl5++NTe7xU0jpwP3GFZCHzRlMN74jJODBpuIwvFavfMzm2cVePB9Mw\n\
-HjK4yv2V4AOBXarPKLUwoN2y30n2A7UMZNVv6P+s3XKuXOJTI8E/k3NUOt0H00kD\n\
-HlEPlnK9iY3UqwJuf2K3U38STQKBgQDFEJIDFMohR3aJ9JYtfIIP25NkOtJzOwQQ\n\
-eJ7I18oPxKjhxe6kmu7NadcD2Lho7lwWJyXo55JIvuKfKlcP1FFC08sVLmzSIqEq\n\
-QbfKgiWRSocadz/sX4uDqaWg0QGBTzIQQhWC5AyBFWrCaK1WGC60wLkX2JGbvvRX\n\
-vDQgFQK7bwKBgAbiM6pW4SqbmQ9rZ1RYh7yHWwf9m6WZDfjpo07cJ6GS0H7pRDOD\n\
-D4S/8V/lTeeat185xMTopOqnaXxNrQVRRjgW7kethPGJKEwbAIo6RvHVwF1/K1jO\n\
-dIR278Ivt7RJCpwN9LYaiDc2AkgvC6vL9MoxTq84f2wIrwDb77KgdRlRAoGAJto6\n\
-f2ME6wTE6TQQu80Vc3zuFU/HmDJlfb3aSGzLCMrUJRc6Erf9JwCcBMUgrod4HmH/\n\
-hmjJnZAM7CaT3aoVj2BkZLuvdsqfDc7BJqr8LyYLdvtV3guEXSQAZLFwY4cyrqPo\n\
-y9KcaILJdqTer9+6raZll776DkPatsWDXWPnEv8CgYEArXmRBpTf/f4Emu7wk8Dn\n\
-ZvWDaeDatH/iCS6DzS9ZGsIwaBk0C1CKZfE9vjfW4TCs79mowdVsP8LLdcEGva8A\n\
-SO9u/JAbum//Pcn0HuPwNT7W3o2nai/u5MYp670H2Y9PYNc8wIrkf1Fswp0LDElw\n\
-LEcjyM3xY1lzeNnNR7YORnI=\n\
------END PRIVATE KEY-----";
 
 int main(void)
 {
-    mbedtls_x509_crt ctx_tmp;
-    mbedtls_x509_crt_init(&ctx_tmp);
-    mbedtls_x509_crt_parse(&ctx_tmp, crt_bl32, sizeof(crt_bl32));
-
-    char buf[100] = { 0 };
-    mbedtls_x509_dn_gets(buf, sizeof(buf), &(ctx_tmp.issuer));
-
-    mbedtls_pk_context key;
-    mbedtls_pk_init(&key);
-    mbedtls_pk_parse_key(&key, key_bl32, sizeof(key_bl32), NULL, 0);
-    mbedtls_rsa_context *rsa = mbedtls_pk_rsa(key);
-
     const char name_manufacturer[] = "CN=Manufacturer,O=Cool company,C=GER";
     const char name_bl1[] = "CN=BL1,O=AP Trusted ROM,C=GER";
     const char name_bl2[] = "CN=BL2,O=Trusted Boot Firmware,C=GER";
