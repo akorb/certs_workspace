@@ -25,17 +25,16 @@ KEY_FILES = $(KEYS_IN_FOLDER)/manufacturer.pem \
 			$(KEYS_IN_FOLDER)/bl32.pem
 
 
-.PHONY: all
+.PHONY: all keys execute_create_certificates clean clean-all
+
 all: create_certificates $(HEADER_OUT)/embedded_certs.h $(HEADER_OUT)/TCIs.h
 
 %.pem:
 	mkdir -p $(KEYS_IN_FOLDER)
 	openssl genrsa -out $@ 2048
 
-.PHONY: keys
 keys: $(KEY_FILES)
 
-.PHONY: execute_create_certificates
 execute_create_certificates: create_certificates
 	./create_certificates
 
@@ -52,11 +51,11 @@ $(HEADER_OUT)/embedded_certs.h: scripts/certs_as_c_arrays.sh execute_create_cert
 	mkdir -p $(HEADER_OUT)
 	sh scripts/certs_as_c_arrays.sh > $@
 
-create_certificates: keys create_certificates.c $(HEADER_OUT)/TCIs.h mbedtls
+create_certificates: create_certificates.c keys $(HEADER_OUT)/TCIs.h mbedtls
 	$(CC) -o $@ $(CFLAGS) \
 	$(LDFLAGS) \
 	$(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
-	$@.c \
+	$< \
 	mbedtls/lib/libmbedtls.a mbedtls/lib/libmbedx509.a mbedtls/lib/libmbedcrypto.a
 
 clean:
