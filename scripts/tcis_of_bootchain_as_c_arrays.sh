@@ -12,13 +12,13 @@ print_array_of_file_hash ()
         awk '{ print $1 }' | \
         xxd -r -p | \
         xxd -i)
-    echo "static const char tci_$2[] = {${BYTES}};"
+    echo "static const unsigned char tci_$2[] = {${BYTES}};"
 }
 
 OPTEE_ROOT=$1
 
-echo '#ifndef INCLUDE_TCIs'
-echo '#define INCLUDE_TCIs'
+echo '#ifndef INCLUDE_TCIs_H'
+echo '#define INCLUDE_TCIs_H'
 echo ''
 # print_array_of_file_hash ${OPTEE_ROOT}/trusted-firmware-a/build/fvp/release/bl1.bin bl1
 print_array_of_file_hash ${OPTEE_ROOT}/trusted-firmware-a/build/fvp/release/bl2.bin bl2
@@ -37,4 +37,4 @@ echo 'static const char tci_ekcert[] = {  0x8c, 0x95, 0x2f, 0x35, 0x52, 0x34, 0x
   0x0c, 0x51, 0x1d, 0x10, 0xb9, 0x48, 0x40, 0x92};'
 
 echo ''
-echo '#endif'
+echo '#endif /* INCLUDE_TCIs_H */'

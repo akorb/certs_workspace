@@ -1,5 +1,6 @@
 .vscode
-main
-*.crt
-*.pem
-*.der
+create_certificates
+keys_in
+certs_out
+mbedtls
+headers_out

@@ -34,9 +34,6 @@ int main(void)
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof(array[0]))
 
-#define CERTS_OUTPUT_FOLDER "certs_out"
-#define KEYS_INPUT_FOLDER "keys_in"
-
 #define DFL_NOT_BEFORE "20230725000000"
 #define DFL_NOT_AFTER "99991231235959"
 #define DFL_SERIAL "1"
