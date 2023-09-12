@@ -1,13 +1,16 @@
+OPTEE_ROOT = $(error Please set the OPTEE_ROOT argument, e.g., with `make OPTEE_ROOT=~/optee`)
+ASN1C_PATH ?= $(OPTEE_ROOT)/asn1c_generations
+MBEDTLS_PATH ?= $(OPTEE_ROOT)/mbedtls
+
 CC=gcc
-CFLAGS=-g -I mbedtls/include -I gen
+CFLAGS=-g -I mbedtls/include -I $(ASN1C_PATH)
 LDFLAGS=-static
 
-OPTEE_ROOT = $(error Please set the OPTEE_ROOT argument, e.g., with `make OPTEE_ROOT=~/optee`)
 KEYS_IN_FOLDER ?= keys_in
 CERTS_OUT_FOLDER ?= certs_out
 HEADER_OUT ?= headers_out
 
-include gen/Makefile.am.libasncodec
+include $(ASN1C_PATH)/Makefile.am.libasncodec
 
 KEY_FILES = $(KEYS_IN_FOLDER)/manufacturer.pem \
 			$(KEYS_IN_FOLDER)/bl1.pem \
@@ -31,9 +34,9 @@ execute_create_certificates: create_certificates
 	./create_certificates
 
 mbedtls:
-	$(MAKE) -C $(OPTEE_ROOT)/mbedtls clean
-	$(MAKE) -C $(OPTEE_ROOT)/mbedtls install DESTDIR=$(shell pwd)/mbedtls
-	$(MAKE) -C $(OPTEE_ROOT)/mbedtls clean
+	$(MAKE) -C $(MBEDTLS_PATH) clean
+	$(MAKE) -C $(MBEDTLS_PATH) install DESTDIR=$(shell pwd)/mbedtls
+	$(MAKE) -C $(MBEDTLS_PATH) clean
 
 $(HEADER_OUT)/TCIs.h: scripts/tcis_of_bootchain_as_c_arrays.sh
 	mkdir -p $(HEADER_OUT)
@@ -48,13 +51,13 @@ create_certificates: keys create_certificates.c $(HEADER_OUT)/TCIs.h mbedtls
 	-I $(HEADER_OUT) $(LDFLAGS) \
 	-D CERTS_OUTPUT_FOLDER=\"$(CERTS_OUT_FOLDER)\" \
 	-D KEYS_INPUT_FOLDER=\"$(KEYS_IN_FOLDER)\" \
-	$(ASN_MODULE_CFLAGS) $(ASN_MODULE_SRCS) \
+	$(ASN_MODULE_CFLAGS) $(addprefix $(ASN1C_PATH)/,$(ASN_MODULE_SRCS)) \
 	$@.c \
 	mbedtls/lib/libmbedtls.a mbedtls/lib/libmbedx509.a mbedtls/lib/libmbedcrypto.a
 
 clean:
 	rm -rf $(CERTS_OUT_FOLDER)/*.crt create_certificates $(HEADER_OUT)/TCIs.h $(HEADER_OUT)/embedded_certs.h $(HEADER_OUT)/TCIs.h mbedtls certs_out
-	$(MAKE) -C $(OPTEE_ROOT)/mbedtls clean
+	$(MAKE) -C $(MBEDTLS_PATH) clean
 	rmdir --ignore-fail-on-non-empty $(CERTS_OUT_FOLDER) $(HEADER_OUT) 2> /dev/null || true
 
 clean-all: clean
