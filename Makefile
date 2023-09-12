@@ -2,15 +2,21 @@ OPTEE_ROOT = $(error Please set the OPTEE_ROOT argument, e.g., with `make OPTEE_
 ASN1C_GEN_PATH ?= $(OPTEE_ROOT)/asn1c_generations
 MBEDTLS_PATH ?= $(OPTEE_ROOT)/mbedtls
 
-CC=gcc
-CFLAGS=-g -I mbedtls/include -I $(ASN1C_GEN_PATH)
-LDFLAGS=-static
-
 KEYS_IN_FOLDER ?= keys_in
 CERTS_OUT_FOLDER ?= certs_out
 HEADER_OUT ?= headers_out
 
 include $(ASN1C_GEN_PATH)/Makefile.am.libasncodec
+
+CC=gcc
+CFLAGS=-g -I mbedtls/include -I $(ASN1C_GEN_PATH)
+CFLAGS += -I $(HEADER_OUT)
+CFLAGS += -D CERTS_OUTPUT_FOLDER=\"$(CERTS_OUT_FOLDER)\"
+CFLAGS += -D KEYS_INPUT_FOLDER=\"$(KEYS_IN_FOLDER)\"
+CFLAGS += -Wall
+CFLAGS += $(ASN_MODULE_CFLAGS)
+LDFLAGS=-static
+
 
 KEY_FILES = $(KEYS_IN_FOLDER)/manufacturer.pem \
 			$(KEYS_IN_FOLDER)/bl1.pem \
@@ -48,10 +54,8 @@ $(HEADER_OUT)/embedded_certs.h: scripts/certs_as_c_arrays.sh execute_create_cert
 
 create_certificates: keys create_certificates.c $(HEADER_OUT)/TCIs.h mbedtls
 	$(CC) -o $@ $(CFLAGS) \
-	-I $(HEADER_OUT) $(LDFLAGS) \
-	-D CERTS_OUTPUT_FOLDER=\"$(CERTS_OUT_FOLDER)\" \
-	-D KEYS_INPUT_FOLDER=\"$(KEYS_IN_FOLDER)\" \
-	$(ASN_MODULE_CFLAGS) $(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
+	$(LDFLAGS) \
+	$(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
 	$@.c \
 	mbedtls/lib/libmbedtls.a mbedtls/lib/libmbedx509.a mbedtls/lib/libmbedcrypto.a
 

@@ -519,7 +519,6 @@ int main(void)
     const char name_bl2[] = "CN=BL2,O=Trusted Boot Firmware,C=GER";
     const char name_bl31[] = "CN=BL31,O=EL3 Runtime Software,C=GER";
     const char name_bl32[] = "CN=BL32,O=OP-TEE OS,C=GER";
-    const char name_ekcert[] = "CN=EKCert,O=TPM EK,C=GER";
 
     cert_info cis[5];
     memset(cis, 0, sizeof(cis));
