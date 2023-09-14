@@ -56,7 +56,7 @@ $(HEADER_OUT)/TCIs.h: scripts/print_tci_header.sh
 	mkdir -p $(@D)
 	sh $< $(OPTEE_ROOT) > $@
 
-$(HEADER_OUT)/boot_chain_keys.h: scripts/print_key_header.sh
+$(HEADER_OUT)/boot_chain_keys.h: scripts/print_key_header.sh $(KEY_FILES)
 	mkdir -p $(@D)
 	sh $< $(KEYS_IN_FOLDER) > $@ 
 
