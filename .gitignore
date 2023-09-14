@@ -1,6 +1,6 @@
 .vscode
 create_certificates
-keys_in
-certs_out
+1_keys
+2_certs
+3_headers
 mbedtls
-headers_out

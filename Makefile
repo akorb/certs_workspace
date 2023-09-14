@@ -2,9 +2,9 @@ OPTEE_ROOT     ?= ..
 ASN1C_GEN_PATH ?= $(OPTEE_ROOT)/asn1c_generations
 MBEDTLS_PATH   ?= $(OPTEE_ROOT)/mbedtls
 
-KEYS_IN_FOLDER   = keys_in
-CERTS_OUT_FOLDER = certs_out
-HEADER_OUT       ?= headers_out
+KEYS_IN_FOLDER   = 1_keys
+CERTS_OUT_FOLDER = 2_certs
+HEADER_OUT      ?= 3_headers
 
 include $(ASN1C_GEN_PATH)/Makefile.am.libasncodec
 
