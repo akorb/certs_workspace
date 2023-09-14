@@ -25,7 +25,7 @@ KEY_FILES = $(KEYS_IN_FOLDER)/manufacturer.pem \
 			$(KEYS_IN_FOLDER)/bl32.pem
 
 
-.PHONY: all keys execute_create_certificates clean clean-all
+.PHONY: all keys execute_create_certificates clean
 
 all: create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h
 
