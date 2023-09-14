@@ -4,8 +4,10 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
+KEY_FILES_PATH=$1
+
 source scripts/common.sh
 
-CONTENT=$(print_ascii_file_as_c_array keys_in bl32 pem key_)
+CONTENT=$(print_ascii_file_as_c_array ${KEY_FILES_PATH} bl32 pem key_)
 
 sh scripts/print_header.sh "KEY_FILE_H" "${CONTENT}"
