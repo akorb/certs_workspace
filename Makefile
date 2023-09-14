@@ -1,4 +1,4 @@
-OPTEE_ROOT = $(error Please set the OPTEE_ROOT argument, e.g., with `make OPTEE_ROOT=~/optee`)
+OPTEE_ROOT ?= ..
 ASN1C_GEN_PATH ?= $(OPTEE_ROOT)/asn1c_generations
 MBEDTLS_PATH ?= $(OPTEE_ROOT)/mbedtls
 
@@ -7,6 +7,11 @@ CERTS_OUT_FOLDER ?= certs_out
 HEADER_OUT ?= headers_out
 
 include $(ASN1C_GEN_PATH)/Makefile.am.libasncodec
+
+# Note the order of this list matters
+# See https://github.com/Mbed-TLS/mbedtls#compiling
+MBEDTLS_LIBRARY_NAMES = libmbedtls.a libmbedx509.a libmbedcrypto.a
+MBEDTLS_LIBRARY_PATHS = $(addprefix mbedtls/library/,$(MBEDTLS_LIBRARY_NAMES))
 
 CC=gcc
 CFLAGS=-g -I mbedtls/include -I $(ASN1C_GEN_PATH)
@@ -39,9 +44,11 @@ execute_create_certificates: create_certificates
 	./create_certificates
 
 mbedtls:
-	$(MAKE) -C $(MBEDTLS_PATH) clean
-	$(MAKE) -C $(MBEDTLS_PATH) install DESTDIR=$(shell pwd)/mbedtls
-	$(MAKE) -C $(MBEDTLS_PATH) clean
+	cp -r $(MBEDTLS_PATH) .
+	$(MAKE) -C mbedtls/library clean
+
+$(MBEDTLS_LIBRARY_PATHS): | mbedtls
+	$(MAKE) -C mbedtls/library CC="$(CC)" AR="$(AR)" $(@F)
 
 $(HEADER_OUT)/TCIs.h: scripts/print_tci_header.sh
 	mkdir -p $(HEADER_OUT)
@@ -59,12 +66,11 @@ $(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh execute_cr
 	mkdir -p $(HEADER_OUT)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
-create_certificates: create_certificates.c keys $(HEADER_OUT)/TCIs.h mbedtls
+create_certificates: create_certificates.c keys $(HEADER_OUT)/TCIs.h $(MBEDTLS_LIBRARY_PATHS)
 	$(CC) -o $@ $(CFLAGS) \
 	$(LDFLAGS) \
 	$(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
-	$< \
-	mbedtls/lib/libmbedtls.a mbedtls/lib/libmbedx509.a mbedtls/lib/libmbedcrypto.a
+	$< $(MBEDTLS_LIBRARY_PATHS)
 
 clean:
 	rm -rf $(CERTS_OUT_FOLDER)/*.crt create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h mbedtls certs_out
