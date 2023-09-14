@@ -4,7 +4,13 @@ MBEDTLS_PATH   ?= $(OPTEE_ROOT)/mbedtls
 
 KEYS_IN_FOLDER   = 1_keys
 CERTS_OUT_FOLDER = 2_certs
-HEADER_OUT      ?= 3_headers
+HEADER_OUT       = 3_headers
+
+HEADER_FILES = cert_root.h \
+               cert_chain.h \
+			   boot_chain_keys.h \
+			   TCIs.h
+HEADER_INSTALL_TARGETS = $(addprefix install-, $(HEADER_FILES))
 
 include $(ASN1C_GEN_PATH)/Makefile.am.libasncodec
 
@@ -25,18 +31,19 @@ CFLAGS += -Wall
 CFLAGS += $(ASN_MODULE_CFLAGS)
 LDFLAGS = -static
 
+# First element must be root certificate
 CHAIN = manufacturer \
 		bl1 \
 		bl2 \
 		bl31 \
 		bl32
 
-KEY_FILES = $(addsuffix .pem, $(addprefix $(KEYS_IN_FOLDER)/,   $(CHAIN)))
-CRT_FILES = $(addsuffix .crt, $(addprefix $(CERTS_OUT_FOLDER)/, $(CHAIN)))
+KEY_FILES = $(addprefix $(KEYS_IN_FOLDER)/,   $(addsuffix .pem, $(CHAIN)))
+CRT_FILES = $(addprefix $(CERTS_OUT_FOLDER)/, $(addsuffix .crt, $(CHAIN)))
 
-.PHONY: all clean
+.PHONY: all clean $(HEADER_INSTALL_TARGETS)
 
-all: create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h
+all: create_certificates $(addprefix $(HEADER_OUT)/, $(HEADER_FILES))
 
 $(KEY_FILES):
 	mkdir -p $(@D)
@@ -60,11 +67,11 @@ $(HEADER_OUT)/boot_chain_keys.h: scripts/print_key_header.sh $(KEY_FILES)
 	mkdir -p $(@D)
 	sh $< $(KEYS_IN_FOLDER) > $@ 
 
-$(HEADER_OUT)/cert_root.h: scripts/print_root_certificate_header.sh $(CRT_FILES)
+$(HEADER_OUT)/cert_root.h: scripts/print_root_certificate_header.sh $(firstname $(CRT_FILES))
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
-$(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(CRT_FILES)
+$(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(wordlist 2, 100, $(CRT_FILES))
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
@@ -74,7 +81,10 @@ create_certificates: create_certificates.c $(KEY_FILES) $(HEADER_OUT)/TCIs.h $(M
 	$(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
 	$< $(MBEDTLS_LIBRARY_PATHS)
 
+$(HEADER_INSTALL_TARGETS): install-%.h: $(HEADER_OUT)/%.h
+	cp $< $(INSTALL_PATH)/$(notdir $<)
+
 clean:
 	$(MAKE) -C $(MBEDTLS_PATH) clean
-	rm -rf $(KEY_FILES) $(CRT_FILES) create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h mbedtls
+	rm -rf $(KEY_FILES) $(CRT_FILES) create_certificates $(addprefix $(HEADER_OUT)/, $(HEADER_FILES)) mbedtls
 	rmdir --ignore-fail-on-non-empty $(CERTS_OUT_FOLDER) $(HEADER_OUT) $(KEYS_IN_FOLDER) 2> /dev/null || true
