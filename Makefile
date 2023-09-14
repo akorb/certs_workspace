@@ -27,7 +27,7 @@ KEY_FILES = $(KEYS_IN_FOLDER)/manufacturer.pem \
 
 .PHONY: all keys execute_create_certificates clean clean-all
 
-all: create_certificates $(HEADER_OUT)/embedded_certs.h $(HEADER_OUT)/TCIs.h
+all: create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h
 
 %.pem:
 	mkdir -p $(KEYS_IN_FOLDER)
@@ -43,13 +43,21 @@ mbedtls:
 	$(MAKE) -C $(MBEDTLS_PATH) install DESTDIR=$(shell pwd)/mbedtls
 	$(MAKE) -C $(MBEDTLS_PATH) clean
 
-$(HEADER_OUT)/TCIs.h: scripts/tcis_of_bootchain_as_c_arrays.sh
+$(HEADER_OUT)/TCIs.h: scripts/print_tci_header.sh
 	mkdir -p $(HEADER_OUT)
-	sh scripts/tcis_of_bootchain_as_c_arrays.sh $(OPTEE_ROOT) > $@
+	sh $< $(OPTEE_ROOT) > $@
 
-$(HEADER_OUT)/embedded_certs.h: scripts/certs_as_c_arrays.sh execute_create_certificates
+$(HEADER_OUT)/boot_chain_keys.h: scripts/print_key_header.sh
 	mkdir -p $(HEADER_OUT)
-	sh scripts/certs_as_c_arrays.sh > $@
+	sh $< $(KEYS_IN_FOLDER) > $@ 
+
+$(HEADER_OUT)/cert_root.h: scripts/print_root_certificate_header.sh execute_create_certificates
+	mkdir -p $(HEADER_OUT)
+	sh $< $(CERTS_OUT_FOLDER) > $@
+
+$(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh execute_create_certificates
+	mkdir -p $(HEADER_OUT)
+	sh $< $(CERTS_OUT_FOLDER) > $@
 
 create_certificates: create_certificates.c keys $(HEADER_OUT)/TCIs.h mbedtls
 	$(CC) -o $@ $(CFLAGS) \
@@ -59,10 +67,8 @@ create_certificates: create_certificates.c keys $(HEADER_OUT)/TCIs.h mbedtls
 	mbedtls/lib/libmbedtls.a mbedtls/lib/libmbedx509.a mbedtls/lib/libmbedcrypto.a
 
 clean:
-	rm -rf $(CERTS_OUT_FOLDER)/*.crt create_certificates $(HEADER_OUT)/TCIs.h $(HEADER_OUT)/embedded_certs.h $(HEADER_OUT)/TCIs.h mbedtls certs_out
+	rm -rf $(CERTS_OUT_FOLDER)/*.crt create_certificates $(HEADER_OUT)/cert_root.h $(HEADER_OUT)/cert_chain.h $(HEADER_OUT)/boot_chain_keys.h $(HEADER_OUT)/TCIs.h mbedtls certs_out
 	$(MAKE) -C $(MBEDTLS_PATH) clean
 	rmdir --ignore-fail-on-non-empty $(CERTS_OUT_FOLDER) $(HEADER_OUT) 2> /dev/null || true
-
-clean-all: clean
 	rm -f $(KEYS_IN_FOLDER)/*.pem
 	rmdir --ignore-fail-on-non-empty $(KEYS_IN_FOLDER) 2> /dev/null || true
