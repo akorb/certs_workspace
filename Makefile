@@ -1,5 +1,5 @@
 OPTEE_ROOT     ?= ..
-ASN1C_GEN_PATH ?= $(OPTEE_ROOT)/asn1c_generations
+ALIAS_CERT_EXT_PATH ?= $(OPTEE_ROOT)/alias_cert_extension
 MBEDTLS_PATH   ?= $(OPTEE_ROOT)/mbedtls
 
 KEYS_IN_FOLDER   = 1_keys
@@ -12,7 +12,7 @@ HEADER_FILES = cert_root.h \
                TCIs.h
 HEADER_INSTALL_TARGETS = $(addprefix install-, $(HEADER_FILES))
 
-include $(ASN1C_GEN_PATH)/Makefile.am.libasncodec
+include $(ALIAS_CERT_EXT_PATH)/Makefile.am.libasncodec
 
 # Note the order of this list matters
 # See https://github.com/Mbed-TLS/mbedtls#compiling
@@ -21,7 +21,7 @@ MBEDTLS_LIBRARY_PATHS = $(addprefix mbedtls/library/,$(MBEDTLS_LIBRARY_NAMES))
 
 CC = gcc
 CFLAGS  = -g
-CFLAGS += -I $(ASN1C_GEN_PATH)
+CFLAGS += -I $(ALIAS_CERT_EXT_PATH)
 CFLAGS += -I mbedtls/include
 CFLAGS += -I $(HEADER_OUT)
 CFLAGS += -D CERTS_OUTPUT_FOLDER=\"$(CERTS_OUT_FOLDER)\"
@@ -77,7 +77,7 @@ $(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(wordlist
 create_certificates: create_certificates.c $(KEY_FILES) $(HEADER_OUT)/TCIs.h $(MBEDTLS_LIBRARY_PATHS)
 	$(CC) -o $@ $(CFLAGS) \
 	$(LDFLAGS) \
-	$(addprefix $(ASN1C_GEN_PATH)/,$(ASN_MODULE_SRCS)) \
+	$(addprefix $(ALIAS_CERT_EXT_PATH)/,$(ASN_MODULE_SRCS)) \
 	$< $(MBEDTLS_LIBRARY_PATHS)
 
 $(HEADER_INSTALL_TARGETS): install-%.h: $(HEADER_OUT)/%.h
