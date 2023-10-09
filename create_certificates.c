@@ -23,9 +23,7 @@ int main(void)
 #include "mbedtls/error.h"
 
 #include <DiceTcbInfo.h>
-
-// Generated during `make`
-#include "TCIs.h"
+#include <TCIs.h>
 
 #include <stdio.h>
 #include <stdlib.h>

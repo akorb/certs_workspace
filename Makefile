@@ -8,8 +8,7 @@ HEADER_OUT       = 3_headers
 
 HEADER_FILES = cert_root.h \
                cert_chain.h \
-               boot_chain_final_key.h \
-               TCIs.h
+               boot_chain_final_key.h
 HEADER_INSTALL_TARGETS = $(addprefix install-, $(HEADER_FILES))
 
 include $(ALIAS_CERT_EXT_PATH)/Makefile.am.libasncodec
@@ -24,6 +23,7 @@ CFLAGS  = -g
 CFLAGS += -I $(ALIAS_CERT_EXT_PATH)
 CFLAGS += -I mbedtls/include
 CFLAGS += -I $(HEADER_OUT)
+CFLAGS += -I include
 CFLAGS += -D CERTS_OUTPUT_FOLDER=\"$(CERTS_OUT_FOLDER)\"
 CFLAGS += -D KEYS_INPUT_FOLDER=\"$(KEYS_IN_FOLDER)\"
 CFLAGS += -Wall
@@ -58,10 +58,6 @@ mbedtls:
 $(MBEDTLS_LIBRARY_PATHS): | mbedtls
 	$(MAKE) -C mbedtls/library CC="$(CC)" AR="$(AR)" $(@F)
 
-$(HEADER_OUT)/TCIs.h: templates/TCIs.h
-	mkdir -p "$(@D)"
-	cp $< $@
-
 $(HEADER_OUT)/boot_chain_final_key.h: scripts/print_final_key_header.sh $(lastword $(KEY_FILES))
 	mkdir -p $(@D)
 	sh $< $(KEYS_IN_FOLDER) > $@ 
@@ -74,7 +70,7 @@ $(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(wordlist
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
-create_certificates: create_certificates.c $(KEY_FILES) $(HEADER_OUT)/TCIs.h $(MBEDTLS_LIBRARY_PATHS)
+create_certificates: create_certificates.c $(KEY_FILES) include/TCIs.h $(MBEDTLS_LIBRARY_PATHS)
 	$(CC) -o $@ $(CFLAGS) \
 	$(LDFLAGS) \
 	$(addprefix $(ALIAS_CERT_EXT_PATH)/,$(ASN_MODULE_SRCS)) \
