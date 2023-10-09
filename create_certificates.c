@@ -23,7 +23,7 @@ int main(void)
 #include "mbedtls/error.h"
 
 #include <DiceTcbInfo.h>
-#include <TCIs.h>
+#include <FWIDs.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,8 +97,8 @@ typedef struct cert_info
     unsigned char key_usage;    /* key usage flags                      */
     unsigned char ns_cert_type; /* NS cert type                         */
     const uint8_t *certificate_policy_val;
-    const uint8_t *tci; /* Trused Componentent Identifier aka Firmware ID (FWID)*/
-    int tci_len;        /* Trused Componentent Identifier aka Firmware ID (FWID)*/
+    const uint8_t *fwid; /* Trusted Componentent Identifier aka Firmware ID (FWID)*/
+    int fwid_len;
 } cert_info;
 
 static const char certficate_names[][64] = {
@@ -402,13 +402,13 @@ static int create_certificate(cert_info ci)
         printf(" ok\n");
     }
 
-    if (ci.tci)
+    if (ci.fwid)
     {
         printf("Add DICE attestation extension...");
 
         uint8_t out_buf[128];
 
-        int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), ci.tci, ci.tci_len);
+        int data_size = generate_attestation_extension_data(out_buf, sizeof(out_buf), sha256_oid, sizeof(sha256_oid), ci.fwid, ci.fwid_len);
         if (data_size <= 0)
         {
             printf("Failed to create DICE attestation extension. Return value: %d\n", data_size);
@@ -567,7 +567,7 @@ int main(void)
     cert_info_bl1->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl1->certificate_policy_val = certificate_policy_val_IDevID;
-    cert_info_bl1->tci = NULL;
+    cert_info_bl1->fwid = NULL;
 
     cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
     cert_info_bl2->issuer_key = KEYS_INPUT_FOLDER "/bl1.pem";
@@ -588,8 +588,8 @@ int main(void)
     cert_info_bl2->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl2->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl2->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl2->tci = tci_bl2;
-    cert_info_bl2->tci_len = sizeof(tci_bl2);
+    cert_info_bl2->fwid = fwid_bl2;
+    cert_info_bl2->fwid_len = sizeof(fwid_bl2);
 
     cert_info_bl31->subject_key = KEYS_INPUT_FOLDER "/bl31.pem";
     cert_info_bl31->issuer_key = KEYS_INPUT_FOLDER "/bl2.pem";
@@ -610,8 +610,8 @@ int main(void)
     cert_info_bl31->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl31->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl31->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl31->tci = tci_bl31;
-    cert_info_bl31->tci_len = sizeof(tci_bl31);
+    cert_info_bl31->fwid = fwid_bl31;
+    cert_info_bl31->fwid_len = sizeof(fwid_bl31);
 
     cert_info_bl32->subject_key = KEYS_INPUT_FOLDER "/bl32.pem";
     cert_info_bl32->issuer_key = KEYS_INPUT_FOLDER "/bl31.pem";
@@ -632,8 +632,8 @@ int main(void)
     cert_info_bl32->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl32->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl32->certificate_policy_val = certificate_policy_val_LDevID;
-    cert_info_bl32->tci = tci_bl32;
-    cert_info_bl32->tci_len = sizeof(tci_bl32);
+    cert_info_bl32->fwid = fwid_bl32;
+    cert_info_bl32->fwid_len = sizeof(fwid_bl32);
 
     int exit_code;
     for (int i = 0; i < ARRAY_LEN(cis); i++)

@@ -70,7 +70,7 @@ $(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(wordlist
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
-create_certificates: create_certificates.c $(KEY_FILES) include/TCIs.h $(MBEDTLS_LIBRARY_PATHS)
+create_certificates: create_certificates.c $(KEY_FILES) include/FWIDs.h $(MBEDTLS_LIBRARY_PATHS)
 	$(CC) -o $@ $(CFLAGS) \
 	$(LDFLAGS) \
 	$(addprefix $(ALIAS_CERT_EXT_PATH)/,$(ASN_MODULE_SRCS)) \
