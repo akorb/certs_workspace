@@ -4,7 +4,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-source scripts/common.sh
+. scripts/common.sh
 
 CERTS_FOLDER=$1
 
@@ -13,6 +13,6 @@ CONTENT=\
  * This is the certificiate of the manufacturer which needs to be inherently trusted
  * and therefore, acts as the root of trust for the certificate chain.
  */
-$(print_ascii_file_as_c_array ${CERTS_FOLDER} manufacturer crt crt_)"
+$(print_ascii_file_as_c_array "${CERTS_FOLDER}" manufacturer crt crt_)"
 
-sh scripts/print_header.sh "CERT_ROOT_H" "${CONTENT}"
+surround_with_header_guards "CERT_ROOT_H" "${CONTENT}"

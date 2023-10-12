@@ -58,15 +58,15 @@ mbedtls:
 $(MBEDTLS_LIBRARY_PATHS): | mbedtls
 	$(MAKE) -C mbedtls/library CC="$(CC)" AR="$(AR)" $(@F)
 
-$(HEADER_OUT)/boot_chain_final_key.h: scripts/print_final_key_header.sh $(lastword $(KEY_FILES))
+$(HEADER_OUT)/boot_chain_final_key.h: scripts/print_final_key_header.sh scripts/common.sh $(lastword $(KEY_FILES))
 	mkdir -p $(@D)
 	sh $< $(KEYS_IN_FOLDER) > $@ 
 
-$(HEADER_OUT)/cert_root.h: scripts/print_root_certificate_header.sh $(firstword $(CRT_FILES))
+$(HEADER_OUT)/cert_root.h: scripts/print_root_certificate_header.sh scripts/common.sh $(firstword $(CRT_FILES))
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
-$(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh $(wordlist 2, 100, $(CRT_FILES))
+$(HEADER_OUT)/cert_chain.h: scripts/print_certificate_chain_header.sh scripts/common.sh $(wordlist 2, 100, $(CRT_FILES))
 	mkdir -p $(@D)
 	sh $< $(CERTS_OUT_FOLDER) > $@
 
