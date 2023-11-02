@@ -45,7 +45,8 @@ int main(void)
 
 /*
 Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
-
+2.23.133.5.4.100.6:  Initial Identity Policy OID
+2.23.133.5.4.100.12: Embedded Certificate Authority Policy OID
 {
     "seq": [
         {
@@ -56,19 +57,29 @@ Generated via https://kjur.github.io/jsrsasign/tool/tool_asn1encoder.html with:
                     }
                 }
             ]
+        },
+        {
+            "seq": [
+                {
+                    "oid": {
+                        "oid": "2.23.133.5.4.100.12"
+                    }
+                }
+            ]
         }
     ]
 }
 */
 // ASN.1 encoded
-static const uint8_t certificate_policy_val_IDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x06};
-static const uint8_t certificate_policy_val_LDevID[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x07};
+static const uint8_t certificate_policy_val_IDevID_and_ECA[] = {0x30, 0x16, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64,
+                                                                0x06, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x0c};
+static const uint8_t certificate_policy_val_ECA[] = {0x30, 0x0b, 0x30, 0x09, 0x06, 0x07, 0x67, 0x81, 0x05, 0x05, 0x04, 0x64, 0x0c};
 
 // Raw values! Not encoded to ASN.1 yet
 // Therefore, usable for ASN1c generated code, but not for mbedtls code
 const asn_oid_arc_t sha256_oid[] = {2, 16, 840, 1, 101, 3, 4, 2, 1};
 
-#define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_IDevID)
+#define CERTIFICATE_POLICY_VAL_LEN sizeof(certificate_policy_val_ECA)
 
 // ASN.1 encoded
 static const char dice_attestation_oid[] = {0x67, 0x81, 0x05, 0x05, 0x04, 0x01};
@@ -96,7 +107,8 @@ typedef struct cert_info
     mbedtls_md_type_t md;       /* Hash used for signing                */
     unsigned char key_usage;    /* key usage flags                      */
     unsigned char ns_cert_type; /* NS cert type                         */
-    const uint8_t *certificate_policy_val;
+    const uint8_t *certificate_policy;
+    int certificate_policy_len;
     const uint8_t *fwid; /* Trusted Componentent Identifier aka Firmware ID (FWID)*/
     int fwid_len;
 } cert_info;
@@ -394,11 +406,11 @@ static int create_certificate(cert_info ci)
         printf(" ok\n");
     }
 
-    if (ci.certificate_policy_val)
+    if (ci.certificate_policy)
     {
         printf("Add certificate policy extension...");
 
-        mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy_val, CERTIFICATE_POLICY_VAL_LEN);
+        mbedtls_x509write_crt_set_extension(&crt, MBEDTLS_OID_CERTIFICATE_POLICIES, MBEDTLS_OID_SIZE(MBEDTLS_OID_CERTIFICATE_POLICIES), 0, ci.certificate_policy, ci.certificate_policy_len);
         printf(" ok\n");
     }
 
@@ -566,7 +578,8 @@ int main(void)
     cert_info_bl1->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl1->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl1->certificate_policy_val = certificate_policy_val_IDevID;
+    cert_info_bl1->certificate_policy = certificate_policy_val_IDevID_and_ECA;
+    cert_info_bl1->certificate_policy_len = sizeof(certificate_policy_val_IDevID_and_ECA);
     cert_info_bl1->fwid = NULL;
 
     cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
@@ -587,7 +600,8 @@ int main(void)
     cert_info_bl2->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl2->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl2->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl2->certificate_policy_val = certificate_policy_val_LDevID;
+    cert_info_bl2->certificate_policy = certificate_policy_val_ECA;
+    cert_info_bl2->certificate_policy_len = sizeof(certificate_policy_val_ECA);
     cert_info_bl2->fwid = fwid_bl2;
     cert_info_bl2->fwid_len = sizeof(fwid_bl2);
 
@@ -609,7 +623,8 @@ int main(void)
     cert_info_bl31->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl31->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl31->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl31->certificate_policy_val = certificate_policy_val_LDevID;
+    cert_info_bl31->certificate_policy = certificate_policy_val_ECA;
+    cert_info_bl31->certificate_policy_len = sizeof(certificate_policy_val_ECA);
     cert_info_bl31->fwid = fwid_bl31;
     cert_info_bl31->fwid_len = sizeof(fwid_bl31);
 
@@ -631,7 +646,8 @@ int main(void)
     cert_info_bl32->subject_identifier = DFL_SUBJ_IDENT;
     cert_info_bl32->authority_identifier = DFL_AUTH_IDENT;
     cert_info_bl32->basic_constraints = DFL_CONSTRAINTS;
-    cert_info_bl32->certificate_policy_val = certificate_policy_val_LDevID;
+    cert_info_bl32->certificate_policy = certificate_policy_val_ECA;
+    cert_info_bl32->certificate_policy_len = sizeof(certificate_policy_val_ECA);
     cert_info_bl32->fwid = fwid_bl32;
     cert_info_bl32->fwid_len = sizeof(fwid_bl32);
 
