@@ -560,6 +560,7 @@ int main(void)
     cert_info_manufacturer->authority_identifier = DFL_AUTH_IDENT;
     cert_info_manufacturer->basic_constraints = DFL_CONSTRAINTS;
 
+    // That's the DeviceID certificate
     cert_info_bl1->subject_key = KEYS_INPUT_FOLDER "/bl1.pem";
     cert_info_bl1->issuer_key = KEYS_INPUT_FOLDER "/manufacturer.pem";
     cert_info_bl1->output_file = certficate_names[1];
@@ -580,7 +581,8 @@ int main(void)
     cert_info_bl1->basic_constraints = DFL_CONSTRAINTS;
     cert_info_bl1->certificate_policy = certificate_policy_val_IDevID_and_ECA;
     cert_info_bl1->certificate_policy_len = sizeof(certificate_policy_val_IDevID_and_ECA);
-    cert_info_bl1->fwid = NULL;
+    cert_info_bl1->fwid = fwid_bl1;
+    cert_info_bl1->fwid_len = sizeof(fwid_bl1);
 
     cert_info_bl2->subject_key = KEYS_INPUT_FOLDER "/bl2.pem";
     cert_info_bl2->issuer_key = KEYS_INPUT_FOLDER "/bl1.pem";
